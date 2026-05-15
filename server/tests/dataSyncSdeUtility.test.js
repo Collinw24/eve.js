@@ -22,7 +22,9 @@ function writeJsonl(sourceDir, name, rows) {
 }
 
 function createMinimalSource() {
-  const sourceDir = fs.mkdtempSync(path.join(repoRoot, "target", "datasync-sde-"));
+  const targetDir = path.join(repoRoot, "target");
+  fs.mkdirSync(targetDir, { recursive: true });
+  const sourceDir = fs.mkdtempSync(path.join(targetDir, "datasync-sde-"));
   writeJsonl(sourceDir, "_sde", [
     { _key: "sde", buildNumber: 123456, releaseDate: "2026-04-30T00:00:00Z" },
   ]);
