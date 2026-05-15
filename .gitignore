@@ -119,3 +119,10 @@ server/tidi_probe.log
 tools/universe-site-seed/last-run.log
 /tools/universe-site-seed/target
 /.vscode
+
+# Local native-mac research artifacts.
+/server/handshake-captures/
+/server/fixtures/mac-auth/*.json
+/tools/macos/scripts/EvEJSConfig.local.sh
+/tools/macos/__pycache__/
+/externalservices/market-server/logs/

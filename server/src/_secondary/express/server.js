@@ -547,6 +547,7 @@ const SOCKET_KEEPALIVE_INITIAL_DELAY_MS = parseNonNegativeIntegerEnv(
 );
 const LOCAL_INTERCEPT_HOSTS = new Set([
   "dev-public-gateway.evetech.net",
+  "live-public-gateway.evetech.net",
   "public-gateway.evetech.net",
 ]);
 const BLOCKED_PROXY_HOSTS = parseHostPatternList(config.proxyBlockedHosts);
@@ -808,6 +809,7 @@ module.exports = {
 module.exports.__testHooks = {
   hostMatchesPattern,
   hostMatchesAnyPattern,
+  localInterceptHosts: Array.from(LOCAL_INTERCEPT_HOSTS),
   parseHostPatternList,
   shouldAllowListedHost,
   shouldBlockHost,

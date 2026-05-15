@@ -6730,8 +6730,8 @@ class DogmaService extends BaseService {
             shipMetadata.ownerID || ownerID,
           )
         : [];
-    const structurePilotInfoEntries =
-      getShipInfo && shipContext.controllingStructure
+    const dockedPilotInfoEntries =
+      getShipInfo && isDockedSession(session)
         ? this._buildCharacterInfoEntries(
             charID,
             charData,
@@ -6813,7 +6813,7 @@ class DogmaService extends BaseService {
                   type: "dict",
                   entries: [
                     [shipID, shipInfoEntry],
-                    ...structurePilotInfoEntries,
+                    ...dockedPilotInfoEntries,
                     ...shipInventoryInfoEntries,
                   ],
                 }
