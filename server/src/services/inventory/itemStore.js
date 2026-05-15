@@ -20,6 +20,10 @@ const {
 const {
   FUEL_BAY_FLAG,
 } = require(path.join(__dirname, "./fuelBayInventory"));
+const {
+  STRUCTURE_DEED_FLAG,
+  isStructureServiceFlag,
+} = require(path.join(__dirname, "../structure/structureInventoryFlags"));
 
 // Fitting flag ranges (hi/med/lo slots, rigs, subsystems).
 // Duplicated from liveFittingState to avoid circular dependency.
@@ -27,6 +31,7 @@ const FITTING_FLAG_RANGES = Object.freeze([
   [11, 34],
   [92, 99],
   [125, 132],
+  [164, 171],
 ]);
 
 function isFittingFlag(flagID) {
@@ -52,6 +57,16 @@ const ITEM_FLAGS = {
   FIGHTER_TUBE_2: 161,
   FIGHTER_TUBE_3: 162,
   FIGHTER_TUBE_4: 163,
+  STRUCTURE_SERVICE_SLOT_0: 164,
+  STRUCTURE_SERVICE_SLOT_1: 165,
+  STRUCTURE_SERVICE_SLOT_2: 166,
+  STRUCTURE_SERVICE_SLOT_3: 167,
+  STRUCTURE_SERVICE_SLOT_4: 168,
+  STRUCTURE_SERVICE_SLOT_5: 169,
+  STRUCTURE_SERVICE_SLOT_6: 170,
+  STRUCTURE_SERVICE_SLOT_7: 171,
+  STRUCTURE_FUEL: 172,
+  STRUCTURE_DEED: STRUCTURE_DEED_FLAG,
   GENERAL_MINING_HOLD: 134,
   SPECIALIZED_COMMAND_CENTER_HOLD: 148,
   SPECIALIZED_MATERIAL_BAY: 151,
@@ -2619,6 +2634,14 @@ function buildMovedItemState(currentItem, destinationLocationID, destinationFlag
     nextState.moduleState = normalizeModuleState({
       ...(currentItem.moduleState || {}),
       online: true,
+    });
+  } else if (!isCharge && isStructureServiceFlag(destinationFlagID)) {
+    // Structure service modules are paid/validated when explicitly onlined.
+    // Fitting them should create a singleton item without silently consuming
+    // fuel or exposing the service.
+    nextState.moduleState = normalizeModuleState({
+      ...(currentItem.moduleState || {}),
+      online: false,
     });
   } else if (!isCharge) {
     nextState.moduleState = normalizeModuleState({

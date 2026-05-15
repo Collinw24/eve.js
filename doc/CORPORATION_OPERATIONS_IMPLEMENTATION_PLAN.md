@@ -1,6 +1,6 @@
 # Corporation Operations Implementation Plan
 
-Date: 2026-05-01
+Date: 2026-05-02
 
 This plan defines the missing and incomplete corporation operation work for the
 server. It is based on `doc/CLIENT_CODE_REFERENCE.md`, the decompiled client

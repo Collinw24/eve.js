@@ -87,6 +87,8 @@ const {
   getTypeDogmaAttributes,
   getTypeAttributeValue,
   isShipFittingFlag,
+  isStructureServiceFlag,
+  isStructureFittingFlag,
   applyModifierGroups,
   typeHasEffectName,
 } = require(path.join(__dirname, "../fitting/liveFittingState"));
@@ -168,6 +170,19 @@ const {
   repairShipAndFittedItemsForSession,
   resolveRookieShipTypeID,
 } = require(path.join(__dirname, "../ship/rookieShipRuntime"));
+const structureServiceModules = require(path.join(
+  __dirname,
+  "../structure/structureServiceModules",
+));
+const {
+  buildStructureDogmaPrimeAttributes,
+  getStructureParentLocationID,
+  primeStructureDogmaItemForSession,
+} = require(path.join(__dirname, "../structure/structureDogmaPrime"));
+const structureCoreFreezeDiagnostics = require(path.join(
+  __dirname,
+  "../structure/structureCoreFreezeDiagnostics",
+));
 const worldData = require(path.join(__dirname, "../../space/worldData"));
 const spaceRuntime = require(path.join(__dirname, "../../space/runtime"));
 
@@ -243,6 +258,7 @@ const INTEGER_NOTIFY_FORMATTER = new Intl.NumberFormat("en-US", {
 });
 const DRONE_CATEGORY_ID = 18;
 const SCANNER_PROBE_CATEGORY_ID = 8;
+const CATEGORY_STRUCTURE = 65;
 const GROUP_SCAN_PROBE_LAUNCHER = 481;
 const GROUP_SCANNER_PROBE = 479;
 const ATTRIBUTE_SHIELD_CAPACITY = 263;
@@ -919,10 +935,10 @@ class DogmaService extends BaseService {
       itemID: Number(structure.structureID) || 0,
       typeID,
       ownerID: Number(structure.ownerCorpID || structure.ownerID) || 0,
-      // The controlled structure is a location dogma item; the client expects
-      // it to behave like the docked structure itself rather than a solar-
-      // system station row.
-      locationID: Number(structure.structureID || structure.locationID) || 0,
+      // The controlled structure is an active-ship dogma item, but its parent
+      // location still needs to be the solar system so client inventory parent
+      // walks cannot loop on structure -> structure.
+      locationID: getStructureParentLocationID(structure, 0),
       flagID: 0,
       quantity: 1,
       singleton: 1,
@@ -1205,6 +1221,26 @@ class DogmaService extends BaseService {
       stacksize,
       customInfo,
     });
+    structureCoreFreezeDiagnostics.traceRow(
+      "DogmaIM.CommonGetInfoEntry",
+      session,
+      {
+        itemID,
+        typeID,
+        ownerID,
+        locationID,
+        flagID,
+        groupID,
+        categoryID,
+        quantity,
+        singleton,
+        stacksize,
+        customInfo,
+      },
+      {
+        description: description || null,
+      },
+    );
     // Keep dogma bootstrap timestamps on the same solar-system sim clock that
     // Michelle is about to use for the initial ballpark. Raw wallclock here
     // causes client-only reconnects into a lagged scene to seed module timers
@@ -1425,9 +1461,11 @@ class DogmaService extends BaseService {
       applyModifierGroups(attributes, directCharacterModifierEntries);
     }
 
-    const sessionShipID = Number(
-      session && (session.activeShipID ?? session.shipID ?? session.shipid),
-    ) || 0;
+    const sessionShipID = this._isControllingStructureSession(session)
+      ? this._getShipID(session)
+      : Number(
+          session && (session.activeShipID ?? session.shipID ?? session.shipid),
+        ) || 0;
     const activeShip =
       (sessionShipID > 0 && findCharacterShip(charID, sessionShipID)) ||
       getActiveShipRecord(charID) ||
@@ -2109,6 +2147,24 @@ class DogmaService extends BaseService {
           marshalDogmaAttributeValue(attributeID, value),
         ]),
     );
+    if (Number(item && item.categoryID) === CATEGORY_STRUCTURE) {
+      for (const [attributeID, value] of Object.entries(
+        buildStructureDogmaPrimeAttributes(item),
+      )) {
+        const numericAttributeID = Number(attributeID);
+        const numericValue = Number(value);
+        if (
+          !Number.isInteger(numericAttributeID) ||
+          !Number.isFinite(numericValue)
+        ) {
+          continue;
+        }
+        attributes[numericAttributeID] = marshalDogmaAttributeValue(
+          numericAttributeID,
+          numericValue,
+        );
+      }
+    }
     const resourceAttributeOverrides =
       this._getFittedModuleResourceAttributeOverrides(item, session);
     if (resourceAttributeOverrides) {
@@ -2573,6 +2629,69 @@ class DogmaService extends BaseService {
     }
     return inventoryEntries;
   }
+  _listStructureFittingItems(structureID, ownerID = 0) {
+    const numericStructureID = Number(structureID) || 0;
+    const numericOwnerID = Number(ownerID) || 0;
+    if (numericStructureID <= 0) {
+      return [];
+    }
+    return listContainerItems(null, numericStructureID, null)
+      .filter((item) => item && isStructureFittingFlag(item.flagID))
+      .filter((item) => {
+        if (numericOwnerID <= 0) {
+          return true;
+        }
+        return Number(item.ownerID) === numericOwnerID;
+      })
+      .sort((left, right) => {
+        const leftFlag = Number(left && left.flagID) || 0;
+        const rightFlag = Number(right && right.flagID) || 0;
+        if (leftFlag !== rightFlag) {
+          return leftFlag - rightFlag;
+        }
+        return (Number(left && left.itemID) || 0) - (Number(right && right.itemID) || 0);
+      });
+  }
+  _buildStructureFittingInfoEntries(
+    structureID,
+    ownerID,
+    session = null,
+    fittedItemsOverride = null,
+  ) {
+    const fittedItems = Array.isArray(fittedItemsOverride)
+      ? fittedItemsOverride
+      : this._listStructureFittingItems(structureID, ownerID);
+    const inventoryEntries = [];
+    for (const item of fittedItems) {
+      const cachedEntry = this._getCachedDockedItemInfoEntry(
+        session,
+        item.itemID,
+        item,
+      );
+      const entry =
+        cachedEntry ||
+        this._buildCommonGetInfoEntry({
+          itemID: item.itemID,
+          typeID: item.typeID,
+          ownerID: item.ownerID || ownerID,
+          locationID: this._coalesce(item.locationID, structureID),
+          flagID: item.flagID,
+          groupID: item.groupID,
+          categoryID: item.categoryID,
+          quantity: item.quantity,
+          singleton: item.singleton,
+          stacksize: item.stacksize,
+          customInfo: item.customInfo || "",
+          description: item.itemName || "structure module",
+          activeEffects: this._buildInventoryItemActiveEffects(item, session),
+          attributes: this._buildInventoryItemAttributeDict(item, session),
+          session,
+        });
+      inventoryEntries.push([item.itemID, entry]);
+      this._cacheDockedItemInfoEntry(session, item.itemID, item, entry);
+    }
+    return inventoryEntries;
+  }
   _buildChargeSublocationRow({
     locationID,
     flagID,
@@ -2615,6 +2734,27 @@ class DogmaService extends BaseService {
       ]],
     };
   }
+  _isControlledStructureFittingItem(item, session) {
+    if (!item || !this._isControllingStructureSession(session)) {
+      return false;
+    }
+    const structureID = Number(
+      session && (session.structureID || session.structureid),
+    ) || 0;
+    if (
+      structureID <= 0 ||
+      Number(item.locationID) !== structureID ||
+      !isStructureFittingFlag(item.flagID)
+    ) {
+      return false;
+    }
+    const structure = this._getDockedStructureRecord(session);
+    const structureOwnerID = Number(
+      (structure && (structure.ownerCorpID || structure.ownerID)) ||
+      (session && (session.corporationID || session.corpid)),
+    ) || 0;
+    return structureOwnerID <= 0 || Number(item.ownerID) === structureOwnerID;
+  }
   _findInventoryItemContext(requestedItemID, session, options = {}) {
     const includeAttributes = options.includeAttributes !== false;
     const charID = this._getCharID(session);
@@ -2646,7 +2786,10 @@ class DogmaService extends BaseService {
     const item = findItemById(numericItemID);
     if (
       !item ||
-      Number(item.ownerID) !== charID ||
+      (
+        Number(item.ownerID) !== charID &&
+        !this._isControlledStructureFittingItem(item, session)
+      ) ||
       Number(item.categoryID) === SHIP_CATEGORY_ID
     ) {
       return null;
@@ -3898,12 +4041,7 @@ class DogmaService extends BaseService {
   }
   _buildCharacterBrain(charID, session = null) {
     return buildBootstrapCharacterBrain(charID, 0, {
-      shipID:
-        session && (
-          session.activeShipID ??
-          session.shipID ??
-          session.shipid
-        ),
+      shipID: this._getShipID(session),
       structureID:
         session && (
           session.structureid ??
@@ -4004,7 +4142,9 @@ class DogmaService extends BaseService {
   _buildShipState(charID, shipID, shipRecord = null, options = {}) {
     const shipCondition = getShipConditionState(shipRecord);
     const fittedItems =
-      options.includeFittedItems === false
+      Array.isArray(options.fittedItems)
+        ? options.fittedItems
+        : options.includeFittedItems === false
         ? []
         : getFittedModuleItems(charID, shipID);
     return {
@@ -4189,6 +4329,14 @@ class DogmaService extends BaseService {
     log.debug("[DogmaIM] ShipOnlineModules");
     const charID = this._getCharID(session);
     const shipID = this._getShipID(session);
+    if (this._isControllingStructureSession(session)) {
+      return {
+        type: "list",
+        items: structureServiceModules.listStructureServiceModules(shipID, {
+          includeOffline: false,
+        }).map((item) => item.itemID),
+      };
+    }
     return {
       type: "list",
       items: getFittedModuleItems(charID, shipID)
@@ -4352,7 +4500,7 @@ class DogmaService extends BaseService {
       count,
     };
   }
-  _throwModuleOnlineUserError(errorMsg = "", moduleItem = null) {
+  _throwModuleOnlineUserError(errorMsg = "", moduleItem = null, details = null) {
     switch (String(errorMsg || "").trim()) {
       case "MODULE_NOT_FOUND":
       case "SHIP_NOT_FOUND":
@@ -4371,6 +4519,19 @@ class DogmaService extends BaseService {
           have: 0,
           need: ONLINE_CAPACITOR_CHARGE_RATIO / 100,
         });
+        break;
+      case "NOT_ENOUGH_STRUCTURE_FUEL":
+      case "NOT_ENOUGH_FUEL":
+        {
+          const requiredQuantity = Number(details && details.requiredQuantity) || 0;
+          const availableQuantity = Number(details && details.availableQuantity) || 0;
+          const detailText = requiredQuantity > 0
+            ? ` Required: ${requiredQuantity}; available: ${availableQuantity}.`
+            : "";
+          this._throwCustomNotifyUserError(
+            `There is not enough fuel in the structure fuel bay to online that service module.${detailText}`,
+          );
+        }
         break;
       default:
         this._throwCustomNotifyUserError(
@@ -5021,6 +5182,112 @@ class DogmaService extends BaseService {
     }
     return null;
   }
+  _setStructureServiceModuleOnlineState(structureID, moduleID, online, session) {
+    const charID = this._getCharID(session);
+    const numericStructureID = Number(structureID) || this._getShipID(session);
+    const numericModuleID = Number(moduleID) || 0;
+    const moduleItem = findItemById(numericModuleID);
+    if (
+      !moduleItem ||
+      Number(moduleItem.locationID) !== numericStructureID ||
+      !isStructureServiceFlag(moduleItem.flagID)
+    ) {
+      return {
+        success: false,
+        errorMsg: "MODULE_NOT_FOUND",
+      };
+    }
+
+    const previousOnline = isModuleOnline(moduleItem);
+    const nextOnline = Boolean(online);
+    if (nextOnline && !previousOnline) {
+      const consumeResult = structureServiceModules.consumeServiceModuleOnlineFuel(
+        numericStructureID,
+        moduleItem,
+      );
+      if (!consumeResult.success) {
+        return {
+          success: false,
+          errorMsg: consumeResult.errorMsg || "NOT_ENOUGH_STRUCTURE_FUEL",
+          data: consumeResult.data || null,
+        };
+      }
+      for (const change of (consumeResult.data && consumeResult.data.changes) || []) {
+        if (!change || !change.item) {
+          continue;
+        }
+        syncInventoryItemForSession(
+          session,
+          change.item,
+          change.previousData || {},
+          { emitCfgLocation: true },
+        );
+      }
+    }
+
+    if (!nextOnline && previousOnline) {
+      const disableValidation = structureServiceModules.checkCanDisableServiceModule(
+        moduleItem,
+        session,
+      );
+      if (!disableValidation.success) {
+        return disableValidation;
+      }
+    }
+
+    const updateResult = updateInventoryItem(numericModuleID, (currentItem) => ({
+      ...currentItem,
+      moduleState: {
+        ...(currentItem.moduleState || {}),
+        online: nextOnline,
+      },
+    }));
+    if (!updateResult.success) {
+      return updateResult;
+    }
+
+    const isOnlineAttributeID = getAttributeIDByNames("isOnline");
+    if (isOnlineAttributeID && previousOnline !== nextOnline) {
+      this._notifyModuleAttributeChanges(session, [[
+        "OnModuleAttributeChanges",
+        charID,
+        numericModuleID,
+        isOnlineAttributeID,
+        this._sessionFileTime(session),
+        nextOnline ? 1 : 0,
+        previousOnline ? 1 : 0,
+        null,
+      ]]);
+    }
+    syncModuleOnlineEffectForSession(session, updateResult.data, {
+      active: nextOnline,
+    });
+
+    const reconcileResult = structureServiceModules.reconcileStructureServices(
+      numericStructureID,
+    );
+    if (!reconcileResult.success) {
+      return reconcileResult;
+    }
+    primeStructureDogmaItemForSession(
+      session,
+      reconcileResult.data,
+      {
+        reason: nextOnline
+          ? "structure-service-module-online"
+          : "structure-service-module-offline",
+      },
+    );
+    log.debug(
+      `[DogmaIM] SetStructureServiceModuleOnlineState applied structureID=${numericStructureID} ` +
+      `module=${JSON.stringify(summarizeModuleItemForLog(updateResult.data))} ` +
+      `previousOnline=${previousOnline === true} nextOnline=${nextOnline}`,
+    );
+    return {
+      success: true,
+      data: updateResult.data,
+    };
+  }
   _setModuleOnlineState(shipID, moduleID, online, session) {
     const charID = this._getCharID(session);
     const numericShipID = Number(shipID) || this._getShipID(session);
@@ -5028,9 +5295,22 @@ class DogmaService extends BaseService {
     const moduleItem = findItemById(numericModuleID);
     if (
       !moduleItem ||
-      Number(moduleItem.ownerID) !== charID ||
       Number(moduleItem.locationID) !== numericShipID
     ) {
+      return {
+        success: false,
+        errorMsg: "MODULE_NOT_FOUND",
+      };
+    }
+    if (isStructureServiceFlag(moduleItem.flagID)) {
+      return this._setStructureServiceModuleOnlineState(
+        numericShipID,
+        numericModuleID,
+        online,
+        session,
+      );
+    }
+    if (Number(moduleItem.ownerID) !== charID) {
       return {
         success: false,
         errorMsg: "MODULE_NOT_FOUND",
@@ -5883,8 +6163,13 @@ class DogmaService extends BaseService {
     log.debug(`[DogmaIM] SetModuleOnline(shipID=${shipID}, moduleID=${moduleID})`);
     const result = this._setModuleOnlineState(shipID, moduleID, true, session);
     if (!result.success) {
-      log.warn(`[DogmaIM] SetModuleOnline rejected moduleID=${moduleID} error=${result.errorMsg}`);
-      this._throwModuleOnlineUserError(result.errorMsg, findItemById(moduleID));
+      const requiredQuantity = Number(result.data && result.data.requiredQuantity) || 0;
+      const availableQuantity = Number(result.data && result.data.availableQuantity) || 0;
+      const fuelDetail = requiredQuantity > 0
+        ? ` requiredFuel=${requiredQuantity} availableFuel=${availableQuantity}`
+        : "";
+      log.warn(`[DogmaIM] SetModuleOnline rejected moduleID=${moduleID} error=${result.errorMsg}${fuelDetail}`);
+      this._throwModuleOnlineUserError(result.errorMsg, findItemById(moduleID), result.data);
     }
     return null;
   }
@@ -5894,7 +6179,7 @@ class DogmaService extends BaseService {
     log.debug(`[DogmaIM] TakeModuleOffline(shipID=${shipID}, moduleID=${moduleID})`);
     const result = this._setModuleOnlineState(shipID, moduleID, false, session);
     if (!result.success) {
-      this._throwModuleOnlineUserError(result.errorMsg, findItemById(moduleID));
+      this._throwModuleOnlineUserError(result.errorMsg, findItemById(moduleID), result.data);
     }
     return null;
   }
@@ -6438,9 +6723,29 @@ class DogmaService extends BaseService {
     if (getShipInfo && shipInfoEntry) {
       this._cacheDockedItemInfoEntry(session, shipID, shipMetadata, shipInfoEntry);
     }
+    const structureFittingItems =
+      getShipInfo && shipContext.controllingStructure
+        ? this._listStructureFittingItems(
+            shipID,
+            shipMetadata.ownerID || ownerID,
+          )
+        : [];
+    const structurePilotInfoEntries =
+      getShipInfo && shipContext.controllingStructure
+        ? this._buildCharacterInfoEntries(
+            charID,
+            charData,
+            characterLocationID,
+          )
+        : [];
     const shipInventoryInfoEntries = getShipInfo
       ? shipContext.controllingStructure
-        ? []
+        ? this._buildStructureFittingInfoEntries(
+            shipID,
+            shipMetadata.ownerID || ownerID,
+            session,
+            structureFittingItems,
+          )
         : this._buildShipInventoryInfoEntries(
           charID,
           shipID,
@@ -6506,7 +6811,11 @@ class DogmaService extends BaseService {
             getShipInfo
               ? {
                   type: "dict",
-                  entries: [[shipID, shipInfoEntry], ...shipInventoryInfoEntries],
+                  entries: [
+                    [shipID, shipInfoEntry],
+                    ...structurePilotInfoEntries,
+                    ...shipInventoryInfoEntries,
+                  ],
                 }
               : this._buildEmptyDict(),
           ],
@@ -6514,10 +6823,13 @@ class DogmaService extends BaseService {
             "shipState",
             getShipInfo
                 ? this._buildActivationState(charID, shipID, shipContext.shipRecord, {
-                    includeFittedItems:
+                  includeFittedItems:
                       shipContext.controllingStructure
-                        ? false
+                        ? true
                         : !deferLoginShipFittingBootstrap,
+                    fittedItems: shipContext.controllingStructure
+                      ? structureFittingItems
+                      : null,
                     // Docked fitting seeds real loaded charge rows through
                     // shipInfo. Keep shipState chargeState disabled there:
                     // any parallel tuple-backed charge bootstrap makes the

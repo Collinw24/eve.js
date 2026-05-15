@@ -9,12 +9,32 @@ const DogmaService = require(path.join(
   repoRoot,
   "server/src/services/dogma/dogmaService",
 ));
+const FighterMgrService = require(path.join(
+  repoRoot,
+  "server/src/services/fighter/fighterMgrService",
+));
+const InvBrokerService = require(path.join(
+  repoRoot,
+  "server/src/services/inventory/invBrokerService",
+));
 const worldData = require(path.join(
   repoRoot,
   "server/src/space/worldData",
 ));
+const structureState = require(path.join(
+  repoRoot,
+  "server/src/services/structure/structureState",
+));
+const {
+  buildStructureInventoryDogmaItem,
+  getStructureParentLocationID,
+} = require(path.join(
+  repoRoot,
+  "server/src/services/structure/structureDogmaPrime",
+));
 
 const originalGetStructureByID = worldData.getStructureByID;
+const originalStructureStateGetStructureByID = structureState.getStructureByID;
 
 function buildControlledStructureSession() {
   return {
@@ -101,8 +121,42 @@ function getDictEntryMap(value) {
   return new Map(value.entries);
 }
 
+function getBrainEffectTargetID(effect) {
+  if (!effect || effect.type !== "objectex1" || !Array.isArray(effect.header)) {
+    return null;
+  }
+  const state = effect.header.find(
+    (entry) => entry && entry.type === "dict" && Array.isArray(entry.entries),
+  );
+  if (!state) {
+    return null;
+  }
+  const targetEntry = state.entries.find(
+    (entry) => Array.isArray(entry) && entry[0] === "toItemID",
+  );
+  return targetEntry ? Number(targetEntry[1]) || null : null;
+}
+
 test.afterEach(() => {
   worldData.getStructureByID = originalGetStructureByID;
+  structureState.getStructureByID = originalStructureStateGetStructureByID;
+});
+
+test("structure dogma prime rows parent the structure to the solar system", () => {
+  const structure = buildControlledStructureRecord();
+  const invItem = buildStructureInventoryDogmaItem(structure);
+
+  assert.equal(invItem.itemID, structure.structureID);
+  assert.equal(invItem.locationID, structure.solarSystemID);
+  assert.notEqual(invItem.locationID, structure.structureID);
+  assert.equal(
+    getStructureParentLocationID({
+      ...structure,
+      solarSystemID: null,
+      locationID: structure.structureID,
+    }, 30000142),
+    30000142,
+  );
 });
 
 test("dogma GetAllInfo primes the controlled structure as the active ship", () => {
@@ -129,6 +183,11 @@ test("dogma GetAllInfo primes the controlled structure as the active ship", () =
   const shipInfo = getKeyValEntry(allInfo, "shipInfo");
   const shipInfoEntries = getDictEntryMap(shipInfo);
   assert.equal(shipInfoEntries.has(structure.structureID), true);
+  assert.equal(
+    shipInfoEntries.has(session.characterID),
+    true,
+    "Expected controlled-structure shipInfo to include the pilot row for client active-ship mapping",
+  );
   assert.equal(shipInfoEntries.has(990112614), false);
 
   const structureShipInfo = shipInfoEntries.get(structure.structureID);
@@ -138,18 +197,64 @@ test("dogma GetAllInfo primes the controlled structure as the active ship", () =
   assert.equal(structureInvRow[2], structure.ownerCorpID);
   assert.equal(
     structureInvRow[3],
-    structure.structureID,
-    "Expected the controlled structure to prime as its own location item",
+    structure.solarSystemID,
+    "Expected the controlled structure item to be parented to its solar system",
   );
+  assert.notEqual(structureInvRow[3], structure.structureID);
   assert.equal(structureInvRow[6], 1657);
   assert.equal(structureInvRow[7], 65);
   const attributeEntries = getDictEntryMap(structureShipFields.get("attributes"));
   assert.equal(attributeEntries.has(2216), true);
+  assert.equal(attributeEntries.get(1175), 0);
+  assert.equal(attributeEntries.get(1176), 0);
+  assert.equal(attributeEntries.get(1177), 0);
+  assert.equal(attributeEntries.get(1224), 1);
+  assert.equal(attributeEntries.get(3101), 56201);
+
+  const pilotShipInfo = shipInfoEntries.get(session.characterID);
+  const pilotShipInfoFields = new Map(pilotShipInfo.args.entries);
+  const pilotShipInfoInvItem = pilotShipInfoFields.get("invItem");
+  const pilotShipInfoRow = new Map(pilotShipInfoInvItem.args.entries).get("line");
+  assert.equal(pilotShipInfoRow[0], session.characterID);
+  assert.equal(pilotShipInfoRow[3], structure.structureID);
+  assert.equal(pilotShipInfoRow[4], 57);
+  assert.equal(pilotShipInfoRow[6], 1);
+  assert.equal(pilotShipInfoRow[7], 3);
 
   const shipState = getKeyValEntry(allInfo, "shipState");
   assert.ok(Array.isArray(shipState), "Expected shipState tuple payload");
   const shipStateEntries = getDictEntryMap(shipState[0]);
   assert.equal(shipStateEntries.has(structure.structureID), true);
+  assert.equal(shipStateEntries.has(session.characterID), true);
+
+  const charInfo = getKeyValEntry(allInfo, "charInfo");
+  assert.ok(Array.isArray(charInfo), "Expected charInfo with bootstrap brain");
+  const charInfoEntries = getDictEntryMap(charInfo[0]);
+  const charInfoPilot = charInfoEntries.get(session.characterID);
+  const charInfoPilotFields = new Map(charInfoPilot.args.entries);
+  const charInfoPilotInvItem = charInfoPilotFields.get("invItem");
+  const charInfoPilotRow = new Map(charInfoPilotInvItem.args.entries).get("line");
+  assert.equal(charInfoPilotRow[3], structure.structureID);
+  assert.equal(charInfoPilotRow[4], 57);
+
+  const shipModifiedCharAttribs = getKeyValEntry(allInfo, "shipModifiedCharAttribs");
+  const modifiedCharFields = new Map(shipModifiedCharAttribs.args.entries);
+  const modifiedCharInvItem = modifiedCharFields.get("invItem");
+  const modifiedCharRow = new Map(modifiedCharInvItem.args.entries).get("line");
+  assert.equal(modifiedCharRow[3], structure.structureID);
+  assert.equal(modifiedCharRow[4], 57);
+
+  const characterBrain = charInfo[1];
+  const brainTargets = new Set(
+    [
+      ...((characterBrain && characterBrain[2]) || []),
+      ...((characterBrain && characterBrain[3]) || []),
+    ]
+      .map(getBrainEffectTargetID)
+      .filter(Boolean),
+  );
+  assert.equal(brainTargets.has(990112614), false);
+  assert.equal(brainTargets.has(structure.structureID), true);
 });
 
 test("dogma ShipGetInfo and ItemGetInfo resolve the controlled structure", () => {
@@ -173,10 +278,15 @@ test("dogma ShipGetInfo and ItemGetInfo resolve the controlled structure", () =>
   const itemInfo = dogma.Handle_ItemGetInfo([structure.structureID], session);
   const itemInfoFields = new Map(itemInfo.args.entries);
   assert.equal(itemInfoFields.get("itemID"), structure.structureID);
+  const itemInfoRow = new Map(itemInfoFields.get("invItem").args.entries).get("line");
   assert.equal(
-    new Map(itemInfoFields.get("invItem").args.entries).get("line")[0],
+    itemInfoRow[0],
     structure.structureID,
   );
+  assert.equal(itemInfoRow[3], structure.solarSystemID);
+  const itemInfoAttributes = getDictEntryMap(itemInfoFields.get("attributes"));
+  assert.equal(itemInfoAttributes.get(1177), 0);
+  assert.equal(itemInfoAttributes.get(3101), 56201);
 });
 
 test("dogma GetAllInfo does not flush deferred docked fitting replay while controlling a structure", () => {
@@ -193,4 +303,43 @@ test("dogma GetAllInfo does not flush deferred docked fitting replay while contr
   assert.ok(session._deferredDockedFittingReplay);
   clearTimeout(session._deferredDockedFittingReplay.selfFlushTimer);
   session._deferredDockedFittingReplay = null;
+});
+
+test("fighterMgr resolves the controlled structure instead of the persisted active ship", () => {
+  const session = buildControlledStructureSession();
+  const structure = buildControlledStructureRecord();
+  const fighterMgr = new FighterMgrService();
+
+  structureState.getStructureByID = (structureID, options) => {
+    assert.equal(Number(structureID), structure.structureID);
+    assert.deepEqual(options, { refresh: false });
+    return structure;
+  };
+
+  const activeShip = fighterMgr._getActiveShip(session);
+  assert.equal(activeShip.itemID, structure.structureID);
+  assert.notEqual(activeShip.itemID, 990112614);
+
+  const fightersForShip = fighterMgr.Handle_GetFightersForShip([], session, {});
+  assert.equal(fightersForShip[0].type, "list");
+  assert.equal(fightersForShip[0].items.length, 0);
+  assert.equal(fightersForShip[1].type, "list");
+  assert.equal(fightersForShip[1].items.length, 0);
+  assert.equal(fightersForShip[2].type, "dict");
+  assert.equal(fightersForShip[2].entries.length, 0);
+});
+
+test("invBroker active ship helpers prefer the controlled structure session ship", () => {
+  const session = buildControlledStructureSession();
+  const structure = buildControlledStructureRecord();
+  const invbroker = new InvBrokerService();
+
+  structureState.getStructureByID = (structureID, options) => {
+    assert.equal(Number(structureID), structure.structureID);
+    assert.deepEqual(options, { refresh: false });
+    return structure;
+  };
+
+  assert.equal(invbroker._getShipId(session), structure.structureID);
+  assert.equal(invbroker._getShipTypeId(session), structure.typeID);
 });

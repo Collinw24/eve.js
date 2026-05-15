@@ -20,6 +20,11 @@ const {
   FUEL_BAY_ATTRIBUTE_ID,
   FUEL_BAY_RESOURCE_KEY,
 } = require(path.join(__dirname, "../inventory/fuelBayInventory"));
+const {
+  STRUCTURE_SERVICE_SLOT_FLAGS,
+  STRUCTURE_FUEL_FLAG,
+  isStructureServiceFlag,
+} = require(path.join(__dirname, "../structure/structureInventoryFlags"));
 
 const CHARGE_CATEGORY_ID = 8;
 const GROUP_SCAN_PROBE_LAUNCHER = 481;
@@ -29,11 +34,17 @@ const SLOT_FAMILY_FLAGS = Object.freeze({
   high: Object.freeze([27, 28, 29, 30, 31, 32, 33, 34]),
   rig: Object.freeze([92, 93, 94, 95, 96, 97, 98, 99]),
   subsystem: Object.freeze([125, 126, 127, 128, 129, 130, 131, 132]),
+  service: Object.freeze([164, 165, 166, 167, 168, 169, 170, 171]),
 });
 const SHIP_FITTING_FLAG_RANGES = Object.freeze([
   Object.freeze([11, 34]),
   Object.freeze([92, 99]),
   Object.freeze([125, 132]),
+]);
+const STRUCTURE_FITTING_FLAG_RANGES = Object.freeze([
+  Object.freeze([11, 34]),
+  Object.freeze([92, 99]),
+  Object.freeze([164, 171]),
 ]);
 const EFFECT_ID_FALLBACK = Object.freeze({
   loPower: 11,
@@ -100,6 +111,13 @@ function normalizeNumericAttributeMap(attributes = {}) {
 function isShipFittingFlag(flagID) {
   const numericFlagID = toInt(flagID, 0);
   return SHIP_FITTING_FLAG_RANGES.some(
+    ([start, end]) => numericFlagID >= start && numericFlagID <= end,
+  );
+}
+
+function isStructureFittingFlag(flagID) {
+  const numericFlagID = toInt(flagID, 0);
+  return STRUCTURE_FITTING_FLAG_RANGES.some(
     ([start, end]) => numericFlagID >= start && numericFlagID <= end,
   );
 }
@@ -604,7 +622,7 @@ const ATTRIBUTE_ARMOR_HP = getAttributeIDByNames("armorHP") || 265;
 const ATTRIBUTE_STRUCTURE_HP = getAttributeIDByNames("hp", "structureHP") || 9;
 const ATTRIBUTE_UPGRADE_CAPACITY =
   getAttributeIDByNames("upgradeCapacity") || 1132;
-const ATTRIBUTE_UPGRADE_LOAD = getAttributeIDByNames("upgradeLoad") || 1154;
+const ATTRIBUTE_UPGRADE_LOAD = getAttributeIDByNames("upgradeLoad") || 1152;
 const ATTRIBUTE_TURRET_SLOTS_LEFT =
   getAttributeIDByNames("turretSlotsLeft") || 102;
 const ATTRIBUTE_LAUNCHER_SLOTS_LEFT =
@@ -2345,12 +2363,16 @@ function selectAutoFitFlagForType(shipItem, fittedItems, typeID) {
 
 module.exports = {
   SLOT_FAMILY_FLAGS,
+  STRUCTURE_SERVICE_SLOT_FLAGS,
+  STRUCTURE_FUEL_FLAG,
   DEFAULT_MODULE_STATE,
   normalizeModuleState,
   getItemModuleState,
   isModuleOnline,
   isEffectivelyOnlineModule,
   isShipFittingFlag,
+  isStructureServiceFlag,
+  isStructureFittingFlag,
   isChargeItem,
   isFittedChargeItem,
   isFittedModuleItem,
