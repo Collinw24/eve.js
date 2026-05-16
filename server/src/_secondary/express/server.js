@@ -292,22 +292,55 @@ function blockHttpProxyRequest(req, res, targetUrl) {
 
 function loadLocalTlsOptions() {
   const certDir = path.join(__dirname, "./certs");
-  const gatewayLeafCertPath = path.join(certDir, "gateway-dev-cert.pem");
-  const gatewayLeafKeyPath = path.join(certDir, "gateway-dev-key.pem");
+  const runtimeGatewayCertDir =
+    process.env.EVEJS_GATEWAY_CERT_DIR ||
+    path.resolve(__dirname, "../../../var/certs/gateway");
+  const envGatewayCertPath = process.env.EVEJS_GATEWAY_CERT_PATH || "";
+  const envGatewayKeyPath = process.env.EVEJS_GATEWAY_KEY_PATH || "";
+  const gatewayLeafCandidates = [
+    {
+      certPath: path.join(runtimeGatewayCertDir, "gateway-dev-cert.pem"),
+      keyPath: path.join(runtimeGatewayCertDir, "gateway-dev-key.pem"),
+    },
+    {
+      certPath: path.join(certDir, "gateway-dev-cert.pem"),
+      keyPath: path.join(certDir, "gateway-dev-key.pem"),
+    },
+  ];
   const pfxPath = path.join(certDir, "gateway-dev.pfx");
   const passphrasePath = path.join(certDir, "gateway-dev-passphrase.txt");
   const certPath = path.join(certDir, "gateway-dev-cert.pem");
 
-  if (fs.existsSync(gatewayLeafCertPath) && fs.existsSync(gatewayLeafKeyPath)) {
-    return {
-      tlsOptions: {
-        key: fs.readFileSync(gatewayLeafKeyPath),
-        cert: fs.readFileSync(gatewayLeafCertPath),
-        allowHTTP1: true,
-        ALPNProtocols: ["h2", "http/1.1"],
-      },
-      certPem: fs.readFileSync(gatewayLeafCertPath),
-    };
+  if (envGatewayCertPath || envGatewayKeyPath) {
+    if (!envGatewayCertPath || !envGatewayKeyPath) {
+      throw new Error(
+        "EVEJS_GATEWAY_CERT_PATH and EVEJS_GATEWAY_KEY_PATH must be set together",
+      );
+    }
+    gatewayLeafCandidates.unshift({
+      certPath: envGatewayCertPath,
+      keyPath: envGatewayKeyPath,
+    });
+  }
+
+  for (const {
+    certPath: gatewayLeafCertPath,
+    keyPath: gatewayLeafKeyPath,
+  } of gatewayLeafCandidates) {
+    if (
+      fs.existsSync(gatewayLeafCertPath) &&
+      fs.existsSync(gatewayLeafKeyPath)
+    ) {
+      return {
+        tlsOptions: {
+          key: fs.readFileSync(gatewayLeafKeyPath),
+          cert: fs.readFileSync(gatewayLeafCertPath),
+          allowHTTP1: true,
+          ALPNProtocols: ["h2", "http/1.1"],
+        },
+        certPem: fs.readFileSync(gatewayLeafCertPath),
+      };
+    }
   }
 
   if (fs.existsSync(pfxPath)) {

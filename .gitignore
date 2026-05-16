@@ -1,4 +1,8 @@
 node_modules
+.DS_Store
+
+# Private community/context dumps for local agent triage; do not publish raw.
+/discord.txt
 tools/ConfigEditor/assets/
 .claude
 server/src/_secondary/image/generated/Character
@@ -122,7 +126,15 @@ tools/universe-site-seed/last-run.log
 
 # Local native-mac research artifacts.
 /server/handshake-captures/
+/server/var/certs/gateway/
 /server/fixtures/mac-auth/*.json
 /tools/macos/scripts/EvEJSConfig.local.sh
 /tools/macos/__pycache__/
+/tools/macos/launcher-session.args
+/tools/macos/client-ca-bundle.pem
+/tools/macos/client-stdout.log
+/tools/macos/client-stderr.log
+/tools/macos/runtime-blue-so-patch.jsonl
+/tools/macos/source-client/
+/tools/macos/staged-client/
 /externalservices/market-server/logs/

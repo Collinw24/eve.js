@@ -11,11 +11,17 @@ STATIC_DATA_SENTINEL="$SERVER_DIR/src/newDatabase/data/solarSystems/data.json"
 RUNTIME_DATA_SENTINEL="$SERVER_DIR/src/newDatabase/data/accounts/data.json"
 CA_CERT_PATH="$REPO_ROOT/server/certs/xmpp-ca-cert.pem"
 CA_KEY_PATH="$REPO_ROOT/server/certs/xmpp-ca-key.pem"
-GATEWAY_CERT_DIR="$REPO_ROOT/server/src/_secondary/express/certs"
+GATEWAY_CERT_DIR="$SERVER_DIR/var/certs/gateway"
 GATEWAY_CERT_PATH="$GATEWAY_CERT_DIR/gateway-dev-cert.pem"
 GATEWAY_KEY_PATH="$GATEWAY_CERT_DIR/gateway-dev-key.pem"
 GATEWAY_CERT_BUILDER="$REPO_ROOT/tools/macos/build-gateway-cert.sh"
 HOST_PLATFORM="$(uname -s)"
+GATEWAY_CERT_REQUIRED_HOSTS=(
+  "dev-public-gateway.evetech.net"
+  "live-public-gateway.evetech.net"
+  "public-gateway.evetech.net"
+  "localhost"
+)
 
 market_mode="none"
 market_pid=""
@@ -75,6 +81,9 @@ cleanup() {
 }
 
 gateway_cert_needs_rebuild() {
+  local san_output=""
+  local required_host=""
+
   if [[ ! -f "$GATEWAY_CERT_PATH" || ! -f "$GATEWAY_KEY_PATH" ]]; then
     return 0
   fi
@@ -83,13 +92,19 @@ gateway_cert_needs_rebuild() {
     return 1
   fi
 
-  if ! openssl x509 -in "$GATEWAY_CERT_PATH" -noout -ext subjectAltName 2>/dev/null |
-    grep -q "DNS:live-public-gateway.evetech.net"; then
+  san_output="$(openssl x509 -in "$GATEWAY_CERT_PATH" -noout -ext subjectAltName 2>/dev/null || true)"
+  for required_host in "${GATEWAY_CERT_REQUIRED_HOSTS[@]}"; do
+    if [[ "$san_output" != *"DNS:${required_host}"* ]]; then
+      return 0
+    fi
+  done
+
+  if ! openssl x509 -in "$GATEWAY_CERT_PATH" -noout -subject -nameopt RFC2253 2>/dev/null |
+    grep -q "CN=live-public-gateway.evetech.net"; then
     return 0
   fi
 
-  if ! openssl x509 -in "$GATEWAY_CERT_PATH" -noout -subject 2>/dev/null |
-    grep -q "CN=live-public-gateway.evetech.net"; then
+  if ! openssl x509 -in "$GATEWAY_CERT_PATH" -noout -checkend 86400 >/dev/null 2>&1; then
     return 0
   fi
 
@@ -236,6 +251,8 @@ ensure_node_deps_and_data
 mkdir -p "$SERVER_DIR/logs/node-reports"
 export EVEJS_PROXY_LOCAL_INTERCEPT="$proxy_local_intercept"
 export EVEJS_CLIENT_HANDSHAKE_MODE="$client_handshake_mode"
+export EVEJS_GATEWAY_CERT_PATH="$GATEWAY_CERT_PATH"
+export EVEJS_GATEWAY_KEY_PATH="$GATEWAY_KEY_PATH"
 if [[ -z "${EVEJS_PROXY_ALLOWED_HOSTS+x}" && "$HOST_PLATFORM" == "Darwin" ]]; then
   export EVEJS_PROXY_ALLOWED_HOSTS="clientresources.eveonline.com"
 fi
@@ -247,6 +264,7 @@ fi
 
 echo "[eve.js] Client handshake mode: $EVEJS_CLIENT_HANDSHAKE_MODE"
 echo "[eve.js] Local public-gateway intercept: $EVEJS_PROXY_LOCAL_INTERCEPT"
+echo "[eve.js] Gateway TLS cert: $EVEJS_GATEWAY_CERT_PATH"
 if [[ -n "${EVEJS_PROXY_ALLOWED_HOSTS:-}" ]]; then
   echo "[eve.js] Proxy allowed hosts: $EVEJS_PROXY_ALLOWED_HOSTS"
 fi
