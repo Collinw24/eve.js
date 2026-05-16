@@ -161,7 +161,7 @@ Acceptance:
 
 ## Phase 6: Regression Tests
 
-Status: pending
+Status: done
 
 Goal: keep Mac support from regressing without requiring CI to launch the real game.
 
@@ -209,9 +209,9 @@ Acceptance:
 
 ## Immediate Next Action
 
-Start Phase 6.
+Start Phase 7.
 
-Reason: the supported public macOS workflow is documented. The next productization gap is regression coverage for script syntax, doctor check-only behavior, gateway certificate SAN generation, and sanitized launch dry-runs without requiring a real game launch.
+Reason: the Mac workflow now has regression coverage for shell syntax, doctor check/quiet behavior, gateway certificate SAN generation, and sanitized launch dry-runs without requiring a real game launch. The remaining productization work is branch and PR structure.
 
 ## Update Log
 
@@ -222,3 +222,4 @@ Reason: the supported public macOS workflow is documented. The next productizati
 - 2026-05-16: Completed Phase 3 setup UX. `StartClientSetup.sh` now prints explicit setup inputs, auto-detects and validates the retail root, rejects tracked private session paths, persists the launcher-session path in ignored local config, validates staged runtime outputs after setup, optionally chains into launcher-session capture, and prints doctor/server/play next commands. Re-ran setup with `--skip-install-ca --no-clean-stage`; validation passed for build `3345923`, doctor quiet passed, and launch dry-run remained sanitized.
 - 2026-05-16: Completed Phase 4 runtime polish. `QuickstartServer.sh` now prints a concise runtime summary covering handshake mode, proxy/gateway mode, CDN allow-list, gateway cert path, market daemon state, and expected nonfatal proxy/market noise. Express proxy blocks now log as expected policy decisions and expose block reasons. Optional market daemon connection failures now explain the `--market-smoke` and `--market-jita` paths. Verified stock and patched Quickstart summaries, alternate-port HTTP/HTTPS health, express proxy tests, doctor quiet, and sanitized `Play.sh --use-captured-session --dry-run`.
 - 2026-05-16: Completed Phase 5 public macOS docs. Added `docs/macos.md` and a README link covering requirements, fresh setup, daily start, launcher-session capture and refresh, staged-client refresh after EVE updates, troubleshooting, ignored/private files, optional market setup, and known limitations.
+- 2026-05-16: Completed Phase 6 regression coverage. Added `server/tests/macosToolingSmoke.test.js` for macOS shell syntax, doctor check/quiet output, runtime gateway cert SANs, and `Play.sh --use-captured-session --dry-run` redaction against a fake staged runtime. `EvEJSConfig.sh` now allows `EVEJS_MAC_LOCAL_CONFIG_PATH` overrides so tests can isolate private local config. Verified the new tooling checks with existing focused handshake, proxy, WAIT_AUTH, docked pilot row, fitting button, and implant tests.

@@ -11,7 +11,7 @@ EVEJS_MAC_DEFAULT_RETAIL_ROOT="${HOME}/Library/Application Support/EVE Online"
 EVEJS_MAC_DEFAULT_SOURCE_ROOT="${HOME}/Library/Application Support/eve.js/macos/source-client"
 EVEJS_MAC_DEFAULT_STAGED_BASE="${HOME}/Library/Application Support/eve.js/macos/staged-client"
 EVEJS_MAC_DEFAULT_SESSION_FILE="${HOME}/Library/Application Support/eve.js/macos/launcher-session.args"
-EVEJS_MAC_LOCAL_CONFIG_PATH="${EVEJS_MAC_CONFIG_DIR}/EvEJSConfig.local.sh"
+: "${EVEJS_MAC_LOCAL_CONFIG_PATH:=${EVEJS_MAC_CONFIG_DIR}/EvEJSConfig.local.sh}"
 
 export EVEJS_REPO_ROOT
 export EVEJS_MAC_CONFIG_DIR
