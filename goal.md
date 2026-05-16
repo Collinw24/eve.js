@@ -185,7 +185,7 @@ Acceptance:
 
 ## Phase 7: PR and Branch Structure
 
-Status: pending
+Status: done
 
 Goal: keep upstream review possible and keep the fork clean.
 
@@ -209,9 +209,9 @@ Acceptance:
 
 ## Immediate Next Action
 
-Start Phase 7.
+Prepare upstream PRs from `collinw24/native-mac-client` using the Phase 7 slice list.
 
-Reason: the Mac workflow now has regression coverage for shell syntax, doctor check/quiet behavior, gateway certificate SAN generation, and sanitized launch dry-runs without requiring a real game launch. The remaining productization work is branch and PR structure.
+Reason: the native macOS productization phases are complete on the Collin-owned branch. The remaining work is external review packaging, not local implementation.
 
 ## Update Log
 
@@ -223,3 +223,4 @@ Reason: the Mac workflow now has regression coverage for shell syntax, doctor ch
 - 2026-05-16: Completed Phase 4 runtime polish. `QuickstartServer.sh` now prints a concise runtime summary covering handshake mode, proxy/gateway mode, CDN allow-list, gateway cert path, market daemon state, and expected nonfatal proxy/market noise. Express proxy blocks now log as expected policy decisions and expose block reasons. Optional market daemon connection failures now explain the `--market-smoke` and `--market-jita` paths. Verified stock and patched Quickstart summaries, alternate-port HTTP/HTTPS health, express proxy tests, doctor quiet, and sanitized `Play.sh --use-captured-session --dry-run`.
 - 2026-05-16: Completed Phase 5 public macOS docs. Added `docs/macos.md` and a README link covering requirements, fresh setup, daily start, launcher-session capture and refresh, staged-client refresh after EVE updates, troubleshooting, ignored/private files, optional market setup, and known limitations.
 - 2026-05-16: Completed Phase 6 regression coverage. Added `server/tests/macosToolingSmoke.test.js` for macOS shell syntax, doctor check/quiet output, runtime gateway cert SANs, and `Play.sh --use-captured-session --dry-run` redaction against a fake staged runtime. `EvEJSConfig.sh` now allows `EVEJS_MAC_LOCAL_CONFIG_PATH` overrides so tests can isolate private local config. Verified the new tooling checks with existing focused handshake, proxy, WAIT_AUTH, docked pilot row, fitting button, and implant tests.
+- 2026-05-16: Completed Phase 7 branch and PR structure checks. Confirmed the active branch is `collinw24/native-mac-client`, `origin` fetch/push points to `Collinw24/eve.js`, and `upstream` fetches from `rrfarmer/eve.js` with push disabled. Productization work is split into reviewable commits for local artifact hygiene and doctor tooling, setup UX, runtime startup polish, public docs, and regression coverage.
