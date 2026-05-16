@@ -36,6 +36,7 @@ EVE.js is an easy-to-use server emulator for Eve Online. We are functional again
 - [Tools and admin basics](doc/TOOLS.md)
 - [Runtime database bootstrap](doc/RUNTIME_DB_BOOTSTRAP.md)
 - [EVE SDE JSONL sync](doc/SDE_JSONL_SYNC.md)
+- [macOS workflow](docs/macos.md)
 - [Feature audit](doc/IMPLEMENTED_FEATURE_STATUS.txt)
 
 ## **Good To Know**
@@ -93,4 +94,3 @@ EVE.js is an easy-to-use server emulator for Eve Online. We are functional again
     - *Asset overview and market-server load insanely fast, thanks to Rust!*
 
 ***The above list will be changes as development continues.***
-
