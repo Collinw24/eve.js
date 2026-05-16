@@ -89,7 +89,7 @@ Acceptance:
 
 ## Phase 3: Setup UX
 
-Status: pending
+Status: done
 
 Goal: make the macOS setup flow feel like the Windows setup flow: guided, predictable, and repeatable.
 
@@ -209,9 +209,9 @@ Acceptance:
 
 ## Immediate Next Action
 
-Start with Phase 1.
+Start Phase 4.
 
-Reason: local artifact hygiene is the largest blocker to calling this a healthy daily-use Mac setup. Until setup and server launch stop modifying tracked cert files, the workflow is too easy to accidentally commit wrong.
+Reason: setup is now repeatable and validated. The next biggest productization gap is making runtime startup and expected network noise clear enough that a Mac user can distinguish nonfatal limitations from real launch blockers.
 
 ## Update Log
 
@@ -219,3 +219,4 @@ Reason: local artifact hygiene is the largest blocker to calling this a healthy 
 - 2026-05-16: Started Phase 1. Gateway cert generation now targets ignored runtime state under `server/var/certs/gateway/`; full client setup replay still needs a deliberate run because it stages a large local EVE copy.
 - 2026-05-16: Started Phase 2 with `tools/macos/doctor.sh`; current machine reports missing prepared source/staged runtime and untrusted local CA, while runtime gateway cert SANs pass.
 - 2026-05-16: Ran `StartClientSetup.sh --skip-install-ca`, installed the local CA separately, and verified `doctor.sh --check` passes required checks. `Play.sh --use-captured-session --dry-run` prints sanitized args and builds the local CA bundle. An alternate-port `QuickstartServer.sh` smoke reached healthy HTTP/HTTPS endpoints with the runtime gateway cert path. Restored pre-existing tracked local config/cert diffs so the repo returns to a clean state after setup and launch verification.
+- 2026-05-16: Completed Phase 3 setup UX. `StartClientSetup.sh` now prints explicit setup inputs, auto-detects and validates the retail root, rejects tracked private session paths, persists the launcher-session path in ignored local config, validates staged runtime outputs after setup, optionally chains into launcher-session capture, and prints doctor/server/play next commands. Re-ran setup with `--skip-install-ca --no-clean-stage`; validation passed for build `3345923`, doctor quiet passed, and launch dry-run remained sanitized.

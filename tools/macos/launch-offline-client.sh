@@ -3,9 +3,16 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-DEFAULT_STAGED_BASE="${HOME}/Library/Application Support/eve.js/macos/staged-client"
+CONFIG_SCRIPT="${REPO_ROOT}/tools/macos/scripts/EvEJSConfig.sh"
+
+if [[ -f "$CONFIG_SCRIPT" ]]; then
+  # shellcheck disable=SC1090
+  . "$CONFIG_SCRIPT"
+fi
+
+DEFAULT_STAGED_BASE="${EVEJS_MAC_STAGED_BASE:-${HOME}/Library/Application Support/eve.js/macos/staged-client}"
 DEFAULT_CAPTURE_DIR="${HOME}/Library/Application Support/eve.js/macos"
-DEFAULT_SESSION_FILE="${DEFAULT_CAPTURE_DIR}/launcher-session.args"
+DEFAULT_SESSION_FILE="${EVEJS_MAC_SESSION_FILE:-${DEFAULT_CAPTURE_DIR}/launcher-session.args}"
 DEFAULT_CA_BUNDLE_PATH="${DEFAULT_CAPTURE_DIR}/client-ca-bundle.pem"
 DEFAULT_CLIENT_STDOUT_PATH="${DEFAULT_CAPTURE_DIR}/client-stdout.log"
 DEFAULT_CLIENT_STDERR_PATH="${DEFAULT_CAPTURE_DIR}/client-stderr.log"
@@ -35,9 +42,9 @@ LAUNCH_ENTRYPOINT_MODE="exefile"
 ENTRYPOINT_EXPLICIT=false
 CA_CERT_PATH="${REPO_ROOT}/server/certs/xmpp-ca-cert.pem"
 CA_BUNDLE_PATH="${DEFAULT_CA_BUNDLE_PATH}"
-PROXY_URL="http://127.0.0.1:26002"
-SERVER_HOST="127.0.0.1"
-SETTINGS_PROFILE="EvEJSLocal"
+PROXY_URL="${EVEJS_PROXY_URL:-http://127.0.0.1:26002}"
+SERVER_HOST="${EVEJS_SERVER_HOST:-127.0.0.1}"
+SETTINGS_PROFILE="${EVEJS_MAC_SETTINGS_PROFILE:-EvEJSLocal}"
 LANGUAGE="en"
 SESSION_FILE=""
 CLIENT_STDOUT_PATH="${DEFAULT_CLIENT_STDOUT_PATH}"

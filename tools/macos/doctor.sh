@@ -9,7 +9,6 @@ CA_KEY_PATH="${REPO_ROOT}/server/certs/xmpp-ca-key.pem"
 GATEWAY_CERT_DIR="${EVEJS_GATEWAY_CERT_DIR:-${REPO_ROOT}/server/var/certs/gateway}"
 GATEWAY_CERT_PATH="${EVEJS_GATEWAY_CERT_PATH:-${GATEWAY_CERT_DIR}/gateway-dev-cert.pem}"
 GATEWAY_KEY_PATH="${EVEJS_GATEWAY_KEY_PATH:-${GATEWAY_CERT_DIR}/gateway-dev-key.pem}"
-SESSION_FILE="${EVEJS_MAC_SESSION_FILE:-${HOME}/Library/Application Support/eve.js/macos/launcher-session.args}"
 SERVER_PORT="${EVEJS_SERVER_PORT:-26000}"
 IMAGE_PORT="${EVEJS_IMAGE_PORT:-26001}"
 PROXY_PORT="${EVEJS_PROXY_PORT:-26002}"
@@ -76,7 +75,9 @@ else
   EVEJS_MAC_SOURCE_ROOT="${EVEJS_MAC_SOURCE_ROOT:-${HOME}/Library/Application Support/eve.js/macos/source-client}"
   EVEJS_MAC_STAGED_BASE="${EVEJS_MAC_STAGED_BASE:-${HOME}/Library/Application Support/eve.js/macos/staged-client}"
   EVEJS_MAC_STAGED_ROOT="${EVEJS_MAC_STAGED_ROOT:-${EVEJS_MAC_STAGED_BASE}/current}"
+  EVEJS_MAC_SESSION_FILE="${EVEJS_MAC_SESSION_FILE:-${HOME}/Library/Application Support/eve.js/macos/launcher-session.args}"
 fi
+SESSION_FILE="${EVEJS_MAC_SESSION_FILE:-${HOME}/Library/Application Support/eve.js/macos/launcher-session.args}"
 
 url_port_or_default() {
   local url="${1:-}"

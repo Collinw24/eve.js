@@ -3,8 +3,15 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+CONFIG_SCRIPT="${REPO_ROOT}/tools/macos/scripts/EvEJSConfig.sh"
+
+if [[ -f "$CONFIG_SCRIPT" ]]; then
+  # shellcheck disable=SC1090
+  . "$CONFIG_SCRIPT"
+fi
+
 DEFAULT_CAPTURE_DIR="${HOME}/Library/Application Support/eve.js/macos"
-DEFAULT_OUTPUT_FILE="${DEFAULT_CAPTURE_DIR}/launcher-session.args"
+DEFAULT_OUTPUT_FILE="${EVEJS_MAC_SESSION_FILE:-${DEFAULT_CAPTURE_DIR}/launcher-session.args}"
 OUTPUT_FILE="${DEFAULT_OUTPUT_FILE}"
 TIMEOUT_SECONDS=180
 POLL_INTERVAL_SECONDS=1
@@ -41,6 +48,13 @@ find_launcher_command() {
   local command=""
   local best_pid=0
   local best_command=""
+  local ps_output=""
+
+  if ! ps_output="$(ps -axww -o pid= -o command= 2>/dev/null)"; then
+    echo "[eve.js] Could not inspect the process list with ps." >&2
+    echo "[eve.js] Grant the launching terminal permission to inspect processes, then retry capture." >&2
+    return 1
+  fi
 
   while IFS= read -r line; do
     trimmed="$(trim_leading_whitespace "$line")"
@@ -64,7 +78,7 @@ find_launcher_command() {
       best_pid="$pid"
       best_command="$command"
     fi
-  done < <(ps -axww -o pid= -o command=)
+  done <<< "$ps_output"
 
   printf '%s' "$best_command"
 }
@@ -257,7 +271,9 @@ echo "[eve.js] When ready, click Play in the retail launcher."
 
 START_TIME="$(date +%s)"
 while true; do
-  command_line="$(find_launcher_command)"
+  if ! command_line="$(find_launcher_command)"; then
+    exit 1
+  fi
   if [[ -n "$command_line" ]]; then
     write_session_args "$command_line" "$OUTPUT_FILE"
     exit 0
