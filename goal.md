@@ -111,7 +111,7 @@ Acceptance:
 
 ## Phase 4: Runtime Polish
 
-Status: pending
+Status: done
 
 Goal: keep the core Mac gameplay path stable and make remaining runtime noise understandable.
 
@@ -209,9 +209,9 @@ Acceptance:
 
 ## Immediate Next Action
 
-Start Phase 4.
+Start Phase 5.
 
-Reason: setup is now repeatable and validated. The next biggest productization gap is making runtime startup and expected network noise clear enough that a Mac user can distinguish nonfatal limitations from real launch blockers.
+Reason: the runtime path now advertises its handshake, proxy, gateway, certificate, CDN, and market state at startup. The next productization gap is a clean public macOS guide that explains the supported workflow without relying on private investigation notes.
 
 ## Update Log
 
@@ -220,3 +220,4 @@ Reason: setup is now repeatable and validated. The next biggest productization g
 - 2026-05-16: Started Phase 2 with `tools/macos/doctor.sh`; current machine reports missing prepared source/staged runtime and untrusted local CA, while runtime gateway cert SANs pass.
 - 2026-05-16: Ran `StartClientSetup.sh --skip-install-ca`, installed the local CA separately, and verified `doctor.sh --check` passes required checks. `Play.sh --use-captured-session --dry-run` prints sanitized args and builds the local CA bundle. An alternate-port `QuickstartServer.sh` smoke reached healthy HTTP/HTTPS endpoints with the runtime gateway cert path. Restored pre-existing tracked local config/cert diffs so the repo returns to a clean state after setup and launch verification.
 - 2026-05-16: Completed Phase 3 setup UX. `StartClientSetup.sh` now prints explicit setup inputs, auto-detects and validates the retail root, rejects tracked private session paths, persists the launcher-session path in ignored local config, validates staged runtime outputs after setup, optionally chains into launcher-session capture, and prints doctor/server/play next commands. Re-ran setup with `--skip-install-ca --no-clean-stage`; validation passed for build `3345923`, doctor quiet passed, and launch dry-run remained sanitized.
+- 2026-05-16: Completed Phase 4 runtime polish. `QuickstartServer.sh` now prints a concise runtime summary covering handshake mode, proxy/gateway mode, CDN allow-list, gateway cert path, market daemon state, and expected nonfatal proxy/market noise. Express proxy blocks now log as expected policy decisions and expose block reasons. Optional market daemon connection failures now explain the `--market-smoke` and `--market-jita` paths. Verified stock and patched Quickstart summaries, alternate-port HTTP/HTTPS health, express proxy tests, doctor quiet, and sanitized `Play.sh --use-captured-session --dry-run`.

@@ -283,10 +283,11 @@ function pipeHttpRequest(req, res, targetUrl) {
   req.pipe(upstreamReq);
 }
 
-function blockHttpProxyRequest(req, res, targetUrl) {
-  log.proxy(`block ${req.method} ${targetUrl.href} -> local deny`);
+function blockHttpProxyRequest(req, res, targetUrl, reason = "local policy") {
+  log.proxy(`EXPECTED-BLOCKED ${req.method} ${targetUrl.href} -> ${reason}`);
   res.statusCode = 204;
   res.setHeader("x-evejs-proxy-blocked", "true");
+  res.setHeader("x-evejs-proxy-block-reason", reason);
   res.end();
 }
 
@@ -609,6 +610,16 @@ function shouldForwardInterceptToUpstream() {
   );
 }
 
+function getGatewayModeLabel() {
+  if (shouldForwardInterceptToUpstream()) {
+    return "forward";
+  }
+  if (shouldHandleInterceptLocally()) {
+    return "local";
+  }
+  return "transparent";
+}
+
 function getGatewayUpstreamTarget(defaultPort) {
   if (!PROXY_FORWARD_UPSTREAM_URL) {
     return null;
@@ -647,7 +658,7 @@ function startServer() {
     }
 
     if (targetUrl && shouldBlockHost(targetUrl.hostname)) {
-      blockHttpProxyRequest(req, res, targetUrl);
+      blockHttpProxyRequest(req, res, targetUrl, "telemetry/local policy");
       return;
     }
 
@@ -675,7 +686,7 @@ function startServer() {
         allowedHosts: ALLOWED_PROXY_HOSTS,
         policy: PROXY_UNHANDLED_HOST_POLICY,
       })) {
-        blockHttpProxyRequest(req, res, targetUrl);
+        blockHttpProxyRequest(req, res, targetUrl, "unhandled host policy");
         return;
       }
       pipeHttpRequest(req, res, targetUrl);
@@ -692,11 +703,7 @@ function startServer() {
     res.status(200).json({
       status: "ok",
       service: "express-secondary",
-      gatewayMode: shouldForwardInterceptToUpstream()
-        ? "forward"
-        : shouldHandleInterceptLocally()
-          ? "local"
-          : "transparent",
+      gatewayMode: getGatewayModeLabel(),
       upstreamBaseUrl: PROXY_FORWARD_UPSTREAM_URL
         ? PROXY_FORWARD_UPSTREAM_URL.toString()
         : null,
@@ -737,11 +744,12 @@ function startServer() {
     }
 
     if (shouldBlockHost(host)) {
-      log.proxy(`CONNECT ${targetRaw} -> BLOCKED local policy`);
+      log.proxy(`CONNECT ${targetRaw} -> EXPECTED-BLOCKED telemetry/local policy`);
       clientSocket.write(
         "HTTP/1.1 403 Forbidden\r\n" +
         "Proxy-Agent: EveJS Elysian\r\n" +
         "X-EveJS-Proxy-Blocked: true\r\n" +
+        "X-EveJS-Proxy-Block-Reason: telemetry/local policy\r\n" +
         "\r\n",
       );
       clientSocket.destroy();
@@ -754,11 +762,12 @@ function startServer() {
       allowedHosts: ALLOWED_PROXY_HOSTS,
       policy: PROXY_UNHANDLED_HOST_POLICY,
     })) {
-      log.proxy(`CONNECT ${targetRaw} -> BLOCKED unhandled host policy`);
+      log.proxy(`CONNECT ${targetRaw} -> EXPECTED-BLOCKED unhandled host policy`);
       clientSocket.write(
         "HTTP/1.1 403 Forbidden\r\n" +
         "Proxy-Agent: EveJS Elysian\r\n" +
         "X-EveJS-Proxy-Blocked: true\r\n" +
+        "X-EveJS-Proxy-Block-Reason: unhandled host policy\r\n" +
         "\r\n",
       );
       clientSocket.destroy();
@@ -819,14 +828,12 @@ function startServer() {
 
   proxyServer.listen(httpPort, bindHost);
 
-  log.debug(
-    `express proxy mode: ${
-      shouldForwardInterceptToUpstream()
-        ? "forward intercept enabled"
-        : shouldHandleInterceptLocally()
-          ? "local intercept enabled"
-          : "transparent forward"
-    }`,
+  log.info(
+    `[ExpressProxy] mode=${getGatewayModeLabel()} ` +
+      `http=${bindHost}:${httpPort} ` +
+      `gatewayHttps=${shouldHandleInterceptLocally() ? `${bindHost}:${httpsPort}` : "disabled"} ` +
+      `allowedHosts=${ALLOWED_PROXY_HOSTS.join(",") || "none"} ` +
+      `unhandledPolicy=${PROXY_UNHANDLED_HOST_POLICY}`,
   );
 }
 

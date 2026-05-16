@@ -80,6 +80,113 @@ cleanup() {
   fi
 }
 
+display_path() {
+  local path="$1"
+  if [[ "$path" == "$HOME" ]]; then
+    printf '~'
+  elif [[ "$path" == "$HOME/"* ]]; then
+    printf '~/%s' "${path#"$HOME/"}"
+  else
+    printf '%s' "$path"
+  fi
+}
+
+url_port_or_default() {
+  local url="${1:-}"
+  local fallback="$2"
+
+  if [[ "$url" =~ :([0-9]+)(/|$) ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+    return
+  fi
+
+  printf '%s' "$fallback"
+}
+
+gateway_mode_summary() {
+  local configured_mode="${EVEJS_PROXY_GATEWAY_MODE:-}"
+  local normalized_mode=""
+
+  if [[ "$proxy_local_intercept" != "1" ]]; then
+    printf 'transparent remote gateway (--remote-gateway)'
+    return
+  fi
+
+  normalized_mode="$(printf '%s' "$configured_mode" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$normalized_mode" == "forward" && -n "${EVEJS_PROXY_UPSTREAM_BASE_URL:-}" ]]; then
+    printf 'forward local intercept to %s' "$EVEJS_PROXY_UPSTREAM_BASE_URL"
+    return
+  fi
+
+  printf 'local public-gateway intercept'
+}
+
+market_daemon_is_reachable() {
+  (: >/dev/tcp/127.0.0.1/40111) >/dev/null 2>&1
+}
+
+market_state_summary() {
+  if [[ "$market_mode" == "smoke" ]]; then
+    printf 'auto-start smoke seed; HTTP 127.0.0.1:40110, RPC 127.0.0.1:40111'
+    return
+  fi
+
+  if [[ "$market_mode" == "jita" ]]; then
+    printf 'auto-start Jita/New Caldari seed; HTTP 127.0.0.1:40110, RPC 127.0.0.1:40111'
+    return
+  fi
+
+  if market_daemon_is_reachable; then
+    printf 'already reachable at 127.0.0.1:40111; not started by this script'
+    return
+  fi
+
+  if [[ -f "$MARKET_DB_PATH" ]]; then
+    printf 'not started; local DB exists, pass --market-smoke or --market-jita to enable seeded market'
+  else
+    printf 'not started; market UI may be limited, pass --market-smoke to build a tiny seed'
+  fi
+}
+
+print_runtime_summary() {
+  local proxy_http_url="${EVEJS_MICROSERVICES_PUBLIC_BASE_URL:-http://127.0.0.1:26002/}"
+  local proxy_http_port=""
+  local gateway_https_port=""
+  local allowed_hosts="${EVEJS_PROXY_ALLOWED_HOSTS:-}"
+  local unhandled_policy="${EVEJS_PROXY_UNHANDLED_HOST_POLICY:-block}"
+  local market_reachable=false
+
+  proxy_http_port="$(url_port_or_default "$proxy_http_url" 26002)"
+  gateway_https_port=$((proxy_http_port + 1))
+  if [[ "$market_mode" == "none" ]] && market_daemon_is_reachable; then
+    market_reachable=true
+  fi
+
+  echo
+  echo "[eve.js] Runtime summary:"
+  echo "  platform:        $HOST_PLATFORM"
+  echo "  game server:     0.0.0.0:${EVEJS_SERVER_PORT:-26000}"
+  echo "  handshake:       $EVEJS_CLIENT_HANDSHAKE_MODE"
+  echo "  gateway mode:    $(gateway_mode_summary)"
+  echo "  proxy HTTP:      $proxy_http_url"
+  echo "  gateway HTTPS:   127.0.0.1:${gateway_https_port}"
+  echo "  gateway cert:    $(display_path "$EVEJS_GATEWAY_CERT_PATH")"
+  echo "  CDN allow-list:  ${allowed_hosts:-none}"
+  echo "  unhandled proxy: $unhandled_policy"
+  echo "  market daemon:   $(market_state_summary)"
+  if [[ "$EVEJS_CLIENT_HANDSHAKE_MODE" == "stock" ]]; then
+    echo "  client path:     stock native/staged client; signedFunc injection disabled"
+  else
+    echo "  client path:     patched-client research flow; signedFunc injection enabled"
+  fi
+  echo
+  echo "[eve.js] Expected nonfatal noise:"
+  echo "  - proxy blocks for telemetry or unhandled hosts are policy decisions, not launch blockers"
+  if [[ "$market_mode" == "none" && "$market_reachable" != true ]]; then
+    echo "  - market daemon offline warnings are expected until you use --market-smoke or --market-jita"
+  fi
+}
+
 gateway_cert_needs_rebuild() {
   local san_output=""
   local required_host=""
@@ -262,17 +369,7 @@ if [[ "$market_mode" != "none" ]]; then
   start_market_daemon
 fi
 
-echo "[eve.js] Client handshake mode: $EVEJS_CLIENT_HANDSHAKE_MODE"
-echo "[eve.js] Local public-gateway intercept: $EVEJS_PROXY_LOCAL_INTERCEPT"
-echo "[eve.js] Gateway TLS cert: $EVEJS_GATEWAY_CERT_PATH"
-if [[ -n "${EVEJS_PROXY_ALLOWED_HOSTS:-}" ]]; then
-  echo "[eve.js] Proxy allowed hosts: $EVEJS_PROXY_ALLOWED_HOSTS"
-fi
-if [[ "$EVEJS_CLIENT_HANDSHAKE_MODE" == "patched" ]]; then
-  echo "[eve.js] Mode: patched-client research path"
-else
-  echo "[eve.js] Mode: stock-client / staged native-mac default"
-fi
+print_runtime_summary
 echo "[eve.js] Starting main server..."
 echo "[eve.js] Press Ctrl+C to stop."
 npm --prefix "$SERVER_DIR" start
