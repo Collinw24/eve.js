@@ -28,6 +28,7 @@ No fixes committed yet in this triage session.
 
 - Confirm post-restart behavior for each committed server fix.
 - Confirm local Gitea mirror exists and receives the stacked fix commits.
+- Retry Gitea mirror push after checking HTTPS transport/auth/server limits. `git push gitea --all` died with signal 15, and a current-branch push idled in `send-pack` for nearly four minutes before being killed locally. `git ls-remote --heads gitea` still returns no refs.
 
 ## Notes
 
