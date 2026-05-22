@@ -3344,6 +3344,53 @@ function syncFittedModulesForSession(session, shipID = null, options = {}) {
   return replayItems.length;
 }
 
+function refreshSpaceShipSlimForSession(session, shipID, reason = "fitting-sync") {
+  if (!session || !session._space || isDockedSession(session)) {
+    return false;
+  }
+  const resolvedShipID = normalizeSessionShipValue(shipID);
+  if (!resolvedShipID) {
+    return false;
+  }
+
+  try {
+    const runtime = require(path.join(__dirname, "../../space/runtime"));
+    const scene =
+      runtime && typeof runtime.getSceneForSession === "function"
+        ? runtime.getSceneForSession(session)
+        : null;
+    const shipEntity =
+      scene && typeof scene.getEntityByID === "function"
+        ? scene.getEntityByID(resolvedShipID)
+        : null;
+    if (!scene || !shipEntity || shipEntity.kind !== "ship") {
+      return false;
+    }
+    const sessionCharacterID = Number(
+      session.characterID || session.charID || session.charid || 0,
+    ) || 0;
+    if (sessionCharacterID > 0) {
+      shipEntity.characterID = sessionCharacterID;
+      shipEntity.pilotCharacterID = sessionCharacterID;
+    }
+    if (typeof scene.sendSlimItemChangesToSession === "function") {
+      scene.sendSlimItemChangesToSession(session, [shipEntity]);
+    }
+    if (typeof scene.broadcastSlimItemChanges === "function") {
+      scene.broadcastSlimItemChanges([shipEntity], session);
+    }
+    log.debug(
+      `[fitting-sync] ship-slim-refresh shipID=${resolvedShipID} reason=${reason}`,
+    );
+    return true;
+  } catch (error) {
+    log.warn(
+      `[fitting-sync] failed ship slim refresh shipID=${resolvedShipID}: ${error.message}`,
+    );
+    return false;
+  }
+}
+
 function syncShipFittingStateForSession(session, shipID = null, options = {}) {
   const charId = session && (session.characterID || session.charid || 0);
   const resolvedShipID =
@@ -3391,6 +3438,13 @@ function syncShipFittingStateForSession(session, shipID = null, options = {}) {
       previousSnapshot,
       nextSnapshot,
     );
+  }
+  if (
+    syncedItemCount > 0 &&
+    options.onlyCharges !== true &&
+    options.broadcastShipSlim !== false
+  ) {
+    refreshSpaceShipSlimForSession(session, resolvedShipID, "character.fitting-replay");
   }
   return syncedItemCount;
 }

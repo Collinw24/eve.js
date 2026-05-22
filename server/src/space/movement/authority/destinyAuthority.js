@@ -769,7 +769,7 @@ function createDestinyAuthority(deps = {}) {
       containsObserverPresentedMonotonicPayload
         ? currentPresentedObserverSubwarpSafeStamp
         : 0;
-    const bootstrapAcquireClearCeilingStamp =
+    const bootstrapAcquireBaseClearCeilingStamp =
       isBootstrapAcquireGroup &&
       isFreshAcquireLifecycleGroup &&
       !isMissileLifecycleGroup &&
@@ -793,6 +793,18 @@ function createDestinyAuthority(deps = {}) {
                   ) >>> 0
                 )
           )
+        : 0;
+    const bootstrapAcquireLastSentFloor =
+      bootstrapAcquireBaseClearCeilingStamp > 0 &&
+      previousLastSentDestinyStamp > 0
+        ? previousLastSentDestinyStamp
+        : 0;
+    const bootstrapAcquireClearCeilingStamp =
+      bootstrapAcquireBaseClearCeilingStamp > 0
+        ? Math.max(
+            bootstrapAcquireBaseClearCeilingStamp,
+            bootstrapAcquireLastSentFloor,
+          ) >>> 0
         : 0;
     const sameRawNonCriticalPresentedLaneHasClearedOwnerFreshAcquireLane =
       previousLastSentDestinyStamp > 0 &&

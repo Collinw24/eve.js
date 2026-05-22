@@ -85,6 +85,7 @@ class MachoNetService extends BaseService {
         ["inSpaceCompressionMgr", null],
         ["structureCompressionMgr", null],
         ["dogmaIM", "character"],
+        ["dynamicItemService", null],
         ["invbroker", "station"],
         ["trademgr", "station"],
         ["tradeMgr", "station"],

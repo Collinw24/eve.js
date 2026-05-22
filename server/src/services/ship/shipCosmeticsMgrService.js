@@ -48,6 +48,54 @@ function getKwargValue(kwargs, key) {
   return match ? match[1] : null;
 }
 
+function refreshLiveShipCosmeticPresentation(session, shipID) {
+  if (!session || !session._space || !shipID) {
+    return false;
+  }
+
+  try {
+    const runtime = require(path.join(__dirname, "../../space/runtime"));
+    const scene =
+      runtime && typeof runtime.getSceneForSession === "function"
+        ? runtime.getSceneForSession(session)
+        : null;
+    const shipEntity =
+      scene && typeof scene.getEntityByID === "function"
+        ? scene.getEntityByID(Number(shipID) || 0)
+        : null;
+    if (!scene || !shipEntity || shipEntity.kind !== "ship") {
+      return false;
+    }
+    const sessionCharacterID = Number(
+      session.characterID || session.charID || session.charid || 0,
+    ) || 0;
+    if (sessionCharacterID > 0) {
+      shipEntity.characterID = sessionCharacterID;
+      shipEntity.pilotCharacterID = sessionCharacterID;
+    }
+    if (typeof runtime.refreshShipDerivedState === "function") {
+      runtime.refreshShipDerivedState(session, {
+        broadcast: false,
+        notifyTargeting: false,
+        notifyGenericModuleAttributes: false,
+      });
+    }
+    if (typeof scene.sendSlimItemChangesToSession === "function") {
+      scene.sendSlimItemChangesToSession(session, [shipEntity]);
+    }
+    if (typeof scene.broadcastSlimItemChanges === "function") {
+      scene.broadcastSlimItemChanges([shipEntity], session);
+      return true;
+    }
+  } catch (error) {
+    log.warn(
+      `[ShipCosmeticsMgr] Failed to refresh live ship cosmetic presentation shipID=${shipID}: ${error.message}`,
+    );
+  }
+
+  return false;
+}
+
 class ShipCosmeticsMgrService extends BaseService {
   constructor() {
     super("shipCosmeticsMgr");
@@ -118,6 +166,7 @@ class ShipCosmeticsMgrService extends BaseService {
       ) || 0;
 
     if (result.success) {
+      refreshLiveShipCosmeticPresentation(session, shipID);
       publishShipStateSetNotice(
         shipID,
         activeCharacterID ||

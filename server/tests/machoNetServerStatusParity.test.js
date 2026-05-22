@@ -78,3 +78,12 @@ test("machoNet GetServerStatus builds parity parameters for special status label
   ]);
   assert.equal(proxyFullEntries.get("status"), "ProxyFullWithLimit");
 });
+
+test("machoNet advertises dynamicItemService for mutaplasmid client calls", () => {
+  const service = new MachoNetService();
+  const serviceInfo = service.getServiceInfoDict();
+  const entries = readDictEntries(serviceInfo);
+
+  assert.equal(entries.has("dynamicItemService"), true);
+  assert.equal(entries.get("dynamicItemService"), null);
+});

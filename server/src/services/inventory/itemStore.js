@@ -338,6 +338,58 @@ function normalizeFighterState(rawValue) {
   return Object.keys(normalized).length > 0 ? normalized : null;
 }
 
+function normalizeDynamicAttributes(rawValue) {
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
+    return null;
+  }
+
+  const normalized = {};
+  for (const [attributeID, rawAttributeValue] of Object.entries(rawValue)) {
+    const numericAttributeID = toNumber(attributeID, 0);
+    const numericValue = toFiniteNumber(
+      rawAttributeValue && typeof rawAttributeValue === "object"
+        ? rawAttributeValue.value
+        : rawAttributeValue,
+      NaN,
+    );
+    if (numericAttributeID > 0 && Number.isFinite(numericValue)) {
+      normalized[String(numericAttributeID)] = numericValue;
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function normalizeDynamicItem(rawValue) {
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
+    return null;
+  }
+
+  const normalized = {};
+  const mutaplasmidTypeID = toNumber(rawValue.mutaplasmidTypeID, 0);
+  const sourceTypeID = toNumber(rawValue.sourceTypeID, 0);
+  const resultingTypeID = toNumber(rawValue.resultingTypeID, 0);
+  const createdAtMs = toFiniteNumber(rawValue.createdAtMs, 0);
+
+  if (mutaplasmidTypeID > 0) {
+    normalized.mutaplasmidTypeID = mutaplasmidTypeID;
+  }
+  if (sourceTypeID > 0) {
+    normalized.sourceTypeID = sourceTypeID;
+  }
+  if (resultingTypeID > 0) {
+    normalized.resultingTypeID = resultingTypeID;
+  }
+  if (createdAtMs > 0) {
+    normalized.createdAtMs = Math.trunc(createdAtMs);
+  }
+  if (rawValue.rolls && typeof rawValue.rolls === "object" && !Array.isArray(rawValue.rolls)) {
+    normalized.rolls = JSON.parse(JSON.stringify(rawValue.rolls));
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
 function normalizeFighterAbilitySlotState(rawValue) {
   if (!rawValue || typeof rawValue !== "object") {
     return null;
@@ -660,6 +712,8 @@ function buildInventoryItem({
   spaceRadius = null,
   stackOriginID = null,
   fighterState = null,
+  dynamicAttributes = null,
+  dynamicItem = null,
 }) {
   const metadata = getItemMetadata(typeID, itemName);
   const defaultSingleton = shouldItemDefaultToSingleton(metadata) ? 1 : 0;
@@ -704,6 +758,8 @@ function buildInventoryItem({
   const normalizedCreatedAtMs = normalizeTimestampMs(createdAtMs);
   const normalizedExpiresAtMs = normalizeTimestampMs(expiresAtMs);
   const normalizedFighterState = normalizeFighterState(fighterState);
+  const normalizedDynamicAttributes = normalizeDynamicAttributes(dynamicAttributes);
+  const normalizedDynamicItem = normalizeDynamicItem(dynamicItem);
 
   if (normalizedCreatedAtMs !== null) {
     item.createdAtMs = normalizedCreatedAtMs;
@@ -753,6 +809,12 @@ function buildInventoryItem({
   }
   if (normalizedFighterState) {
     item.fighterState = normalizedFighterState;
+  }
+  if (normalizedDynamicAttributes) {
+    item.dynamicAttributes = normalizedDynamicAttributes;
+  }
+  if (normalizedDynamicItem) {
+    item.dynamicItem = normalizedDynamicItem;
   }
 
   return item;
@@ -842,6 +904,12 @@ function normalizeInventoryItem(rawItem, defaults = {}) {
     fighterState: Object.prototype.hasOwnProperty.call(rawItem, "fighterState")
       ? rawItem.fighterState
       : defaults.fighterState ?? null,
+    dynamicAttributes: Object.prototype.hasOwnProperty.call(rawItem, "dynamicAttributes")
+      ? rawItem.dynamicAttributes
+      : defaults.dynamicAttributes ?? null,
+    dynamicItem: Object.prototype.hasOwnProperty.call(rawItem, "dynamicItem")
+      ? rawItem.dynamicItem
+      : defaults.dynamicItem ?? null,
   });
 }
 
