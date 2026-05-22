@@ -37,6 +37,15 @@ Verification:
 - Passed: `node --test --test-concurrency=1 server/tests/dynamicItemServiceParity.test.js server/tests/shipCosmeticsApplyParity.test.js server/tests/implantInjectionParity.test.js server/tests/machoNetServerStatusParity.test.js server/tests/shipSlimFittingReplay.test.js server/tests/capitalNpcCommandFamily.test.js server/tests/chatCommandsNpcWarp.test.js server/tests/shipLogoGatewayParity.test.js server/tests/publicGatewayCompatibilityStubs.test.js`
 - Additional probe failed outside this issue batch: selected `spaceMissileParity.test.js` and `spaceMovementContracts.test.js` destiny timing patterns still fail on existing missile/movement lane assertions. The fix batch does not broaden into missile lifecycle timing; revisit separately before touching shared destiny policy.
 
+### 2026-05-22 Main Merge And Gitea Tracking
+
+- Merged the native Mac client branch and the first server triage fix batch into `main` with commit `9c62cf5854fbc8d0ab10e7684d00c7e588d638fd`.
+- Resolved merge conflicts by keeping main's generated/runtime ignore rules plus Mac ignores, preserving all README guide links, combining structure and docked pilot `GetAllInfo` rows, and combining dependent-entity slim visibility checks with the session-safe slim refresh stamp.
+- Verified merged `main`: `node --test --test-concurrency=1 server/tests/dynamicItemServiceParity.test.js server/tests/shipCosmeticsApplyParity.test.js server/tests/implantInjectionParity.test.js server/tests/machoNetServerStatusParity.test.js server/tests/shipSlimFittingReplay.test.js server/tests/capitalNpcCommandFamily.test.js server/tests/chatCommandsNpcWarp.test.js server/tests/shipLogoGatewayParity.test.js server/tests/publicGatewayCompatibilityStubs.test.js server/tests/dockedPilotShipInfoParity.test.js server/tests/fittingFitButtonParity.test.js server/tests/expressProxyBlockedHosts.test.js server/tests/handshakeTidiSignedFunc.test.js server/tests/macosToolingSmoke.test.js server/tests/waitAuthCaptureAnalyzer.test.js server/tests/waitAuthReplayFixture.test.js server/tests/dataSyncSdeUtility.test.js`
+- Result: 62 passed, 0 failed, 1 skipped (`stock Mac WAIT_AUTH fixture replay`, because the local stock Mac fixture is not present).
+- Pushed only `main` to Gitea. `git ls-remote --heads gitea` reports a single branch: `refs/heads/main`.
+- Added fix comments to Gitea issues #1-#5 and closed all five.
+
 ## Issue Tracking
 
 Gitea issue tracker: `https://git.luxiumdigital.net/collin/eve.js/issues`
@@ -82,12 +91,10 @@ Five read-only research agents inspected the live logs and code paths. No server
 
 ## Deferred Restart Checks
 
-- Confirm post-restart behavior for each committed server fix.
-- Confirm local Gitea mirror exists and receives the stacked fix commits.
-- Retry Gitea mirror push after checking HTTPS transport/auth/server limits. `git push gitea --all` died with signal 15, and a current-branch push idled in `send-pack` for nearly four minutes before being killed locally. `git ls-remote --heads gitea` still returns no refs.
-- Re-run the five issue-specific restart checks above after the next intentional server restart.
+- Confirm post-restart behavior for each committed server fix in the live client.
+- Re-run the five issue-specific restart checks above after the next intentional server/client launch.
 
 ## Notes
 
-- Server restarts are intentionally deferred.
+- The server and client were intentionally left off after the user cancelled the restart request.
 - For code fixes, stage only the files intentionally touched for that fix and leave live runtime/data churn alone unless the issue requires it.
