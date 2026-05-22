@@ -53,6 +53,9 @@ const {
   getEntityNote,
   setEntityNote,
 } = require(path.join(__dirname, "./characterNoteState"));
+const {
+  buildActiveImplantEntries,
+} = require(path.join(__dirname, "./activeImplantSerializer"));
 
 function resolveCharacterInfo(args, session) {
   const charId =
@@ -395,13 +398,17 @@ class CharMgrService extends BaseService {
       ],
       [
         "implants",
-        buildCloneEntries(charData.implants || [], (entry) =>
+        buildDict(buildActiveImplantEntries(charData.implants || [], (entry) =>
           buildKeyVal([
+            ["itemID", Number(entry.itemID || 0)],
+            ["implantID", Number(entry.implantID || entry.itemID || 0)],
             ["typeID", Number(entry.typeID || 0)],
+            ["implantTypeID", Number(entry.implantTypeID || entry.typeID || 0)],
             ["name", entry.name || ""],
             ["slot", Number(entry.slot || 0)],
+            ["implantSlot", Number(entry.implantSlot || entry.slot || 0)],
           ]),
-        ),
+        )),
       ],
       ["timeLastJump", buildFiletimeLong(charData.timeLastCloneJump || 0n)],
     ]);

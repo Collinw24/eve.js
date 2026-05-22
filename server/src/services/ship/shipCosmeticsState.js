@@ -59,10 +59,10 @@ function ensureRuntimeRoot() {
 
 function writeRuntimeRoot(runtimeRoot) {
   const nextRoot = {
-    ...runtimeRoot,
+    ...cloneValue(runtimeRoot || {}),
     meta:
       runtimeRoot.meta && typeof runtimeRoot.meta === "object"
-        ? runtimeRoot.meta
+        ? cloneValue(runtimeRoot.meta)
         : {
             description:
               "Runtime ship cosmetic ownership and applied-skin state.",
@@ -205,7 +205,7 @@ function setCharacterSkinOverride(charId, skinID, override) {
     return false;
   }
 
-  const runtimeRoot = ensureRuntimeRoot();
+  const runtimeRoot = cloneValue(ensureRuntimeRoot());
   const characterEntry = getCharacterRuntimeEntry(runtimeRoot, numericCharID);
   characterEntry.skinOverridesBySkinID[String(numericSkinID)] = {
     skinID: numericSkinID,
@@ -378,7 +378,7 @@ function applySkinToShip(shipID, skinID) {
     }
   }
 
-  const runtimeRoot = ensureRuntimeRoot();
+  const runtimeRoot = cloneValue(ensureRuntimeRoot());
   runtimeRoot.ships[String(numericShipID)] = {
     shipID: numericShipID,
     ownerID: Number(shipItem.ownerID || 0) || null,

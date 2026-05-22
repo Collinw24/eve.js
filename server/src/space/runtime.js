@@ -20270,7 +20270,20 @@ class SolarSystemScene {
     }
 
     const refreshedEntities = refreshEntitiesForSlimPayload(entities);
-    const stamp = this.getNextDestinyStamp();
+    const nowMs = this.getCurrentSimTimeMs();
+    const stamp = Math.max(
+      this.getHistorySafeSessionDestinyStamp(
+        session,
+        nowMs,
+        1,
+        MICHELLE_HELD_FUTURE_DESTINY_LEAD,
+      ),
+      this.getCurrentPresentedSessionDestinyStamp(
+        session,
+        nowMs,
+        MICHELLE_POST_HELD_FUTURE_DESTINY_LEAD,
+      ),
+    ) >>> 0;
     const updates = refreshedEntities
       .filter(Boolean)
       .map((entity) => ({
@@ -28012,5 +28025,3 @@ runtimeExports._testing = {
   resolveShipSkinMaterialSetID,
   allocateRuntimeEntityIDForTesting: allocateRuntimeEntityID,
 };
-
-

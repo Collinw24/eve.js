@@ -8,9 +8,21 @@ const CharService = require(path.join(
   repoRoot,
   "server/src/services/character/charService",
 ));
+const CharMgrService = require(path.join(
+  repoRoot,
+  "server/src/services/character/charMgrService",
+));
 const DogmaService = require(path.join(
   repoRoot,
   "server/src/services/dogma/dogmaService",
+));
+const JumpCloneService = require(path.join(
+  repoRoot,
+  "server/src/services/station/jumpCloneService",
+));
+const SkillMgrService = require(path.join(
+  repoRoot,
+  "server/src/services/skills/skillMgrService",
 ));
 const {
   applyCharacterToSession,
@@ -125,6 +137,39 @@ function grantImplant(characterID, stationID, typeID, quantity = 1) {
 function getAttributeValue(attributeDict, attributeID) {
   const entry = attributeDict.entries.find(([key]) => Number(key) === Number(attributeID));
   return entry ? Number(entry[1]) : null;
+}
+
+function keyValEntries(payload) {
+  return payload &&
+    payload.args &&
+    payload.args.type === "dict" &&
+    Array.isArray(payload.args.entries)
+      ? payload.args.entries
+      : [];
+}
+
+function getKeyValValue(payload, key) {
+  const entry = keyValEntries(payload).find(([entryKey]) => String(entryKey) === String(key));
+  return entry ? entry[1] : null;
+}
+
+function dictEntries(payload) {
+  return payload && payload.type === "dict" && Array.isArray(payload.entries)
+    ? payload.entries
+    : [];
+}
+
+function assertImplantTransportPayload(payload, implantItem) {
+  const entries = dictEntries(payload);
+  const entry = entries.find(([key]) => Number(key) === Number(implantItem.itemID));
+  assert.ok(entry, `expected implant entry keyed by itemID ${implantItem.itemID}`);
+  const value = entry[1];
+  assert.equal(getKeyValValue(value, "itemID"), implantItem.itemID);
+  assert.equal(getKeyValValue(value, "implantID"), implantItem.itemID);
+  assert.equal(getKeyValValue(value, "typeID"), implantItem.typeID);
+  assert.equal(getKeyValValue(value, "implantTypeID"), implantItem.typeID);
+  assert.equal(getKeyValValue(value, "slot"), 2);
+  assert.equal(getKeyValValue(value, "implantSlot"), 2);
 }
 
 test("dogma InjectImplant consumes one implant and persists it on the character", (t) => {
@@ -268,5 +313,50 @@ test("character attributes include active implant primary-attribute bonuses", (t
   assert.equal(
     getAttributeValue(dogma.Handle_GetCharacterAttributes([], session), ATTRIBUTE_MEMORY),
     23,
+  );
+});
+
+test("active implant retrieval paths expose the injected implant by stable item identity", (t) => {
+  const snapshot = snapshotMutableTables();
+  t.after(() => restoreMutableTables(snapshot));
+  resetInventoryStoreForTests();
+
+  const { characterID, stationID } = createCharacter(970204, "Implant Transport Test");
+  grantCybernetics(characterID);
+  const implantItem = grantImplant(
+    characterID,
+    stationID,
+    MEMORY_AUGMENTATION_BASIC_TYPE_ID,
+    1,
+  );
+  const ship = getActiveShipRecord(characterID);
+  const session = buildDockedSession(characterID, stationID, ship.itemID);
+  assert.equal(
+    applyCharacterToSession(session, characterID, {
+      emitNotifications: false,
+      logSelection: false,
+    }).success,
+    true,
+  );
+
+  const dogma = new DogmaService();
+  dogma.Handle_InjectImplant([implantItem.itemID], session);
+
+  const skillMgr = new SkillMgrService();
+  assertImplantTransportPayload(
+    skillMgr.Handle_GetImplants([], session),
+    implantItem,
+  );
+
+  const charMgr = new CharMgrService();
+  assertImplantTransportPayload(
+    getKeyValValue(charMgr.Handle_GetCloneInfo([], session), "implants"),
+    implantItem,
+  );
+
+  const jumpCloneSvc = new JumpCloneService();
+  assertImplantTransportPayload(
+    getKeyValValue(jumpCloneSvc.Handle_GetCloneState([], session), "implants"),
+    implantItem,
   );
 });

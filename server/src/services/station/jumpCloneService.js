@@ -14,11 +14,13 @@ const {
   buildBoundObjectResponse,
   resolveBoundNodeId,
 } = require(path.join(__dirname, "../_shared/serviceHelpers"));
+const {
+  buildActiveImplantEntries,
+} = require(path.join(__dirname, "../character/activeImplantSerializer"));
 
 function buildCloneState(session = null) {
   const charData = getCharacterRecord(session && session.characterID) || {};
   const clones = Array.isArray(charData.jumpClones) ? charData.jumpClones : [];
-  const implants = Array.isArray(charData.implants) ? charData.implants : [];
   return buildKeyVal([
     [
       "clones",
@@ -36,14 +38,17 @@ function buildCloneState(session = null) {
     [
       "implants",
       buildDict(
-        implants.map((entry, index) => [
-          Number(entry.typeID || entry.itemID || index + 1),
+        buildActiveImplantEntries(charData.implants, (entry) =>
           buildKeyVal([
+            ["itemID", Number(entry.itemID || 0)],
+            ["implantID", Number(entry.implantID || entry.itemID || 0)],
             ["typeID", Number(entry.typeID || 0)],
+            ["implantTypeID", Number(entry.implantTypeID || entry.typeID || 0)],
             ["slot", Number(entry.slot || 0)],
+            ["implantSlot", Number(entry.implantSlot || entry.slot || 0)],
             ["name", entry.name || ""],
           ]),
-        ]),
+        ),
       ),
     ],
     ["timeLastJump", buildFiletimeLong(charData.timeLastCloneJump || 0n)],

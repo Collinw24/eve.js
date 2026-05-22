@@ -54,6 +54,9 @@ const {
   buildCharacterSkillDict,
   buildCharacterSkillEntry,
 } = require(path.join(__dirname, "./skillTransport"));
+const {
+  buildActiveImplantEntries,
+} = require(path.join(__dirname, "../character/activeImplantSerializer"));
 
 const ATTRIBUTE_CHARISMA = 164;
 const ATTRIBUTE_INTELLIGENCE = 165;
@@ -411,13 +414,12 @@ class SkillMgrService extends BaseService {
   Handle_GetImplants(args, session) {
     log.debug("[SkillMgr] GetImplants called");
     const charData = this._getCharacterData(session);
-    const implants = Array.isArray(charData.implants) ? charData.implants : [];
     return {
       type: "dict",
-      entries: implants.map((entry, index) => [
-        Number(entry.typeID || entry.itemID || index + 1),
-        buildKeyVal(Object.entries(entry || {})),
-      ]),
+      entries: buildActiveImplantEntries(
+        charData.implants,
+        (entry) => buildKeyVal(Object.entries(entry)),
+      ),
     };
   }
 

@@ -22,7 +22,20 @@ Date started: 2026-05-22
 
 ## Fix Log
 
-No server fixes committed yet in this triage session.
+### 2026-05-22 Local Fix Batch
+
+No server restart was performed.
+
+- Highslot launcher ship rendering: in-space fitting sync now refreshes live ship slim presentation after module replay, and direct slim refreshes use session-safe destiny stamps. Added `shipSlimFittingReplay.test.js` for a highslot Dread Guristas XL launcher tuple.
+- Ship SKIN apply: cosmetic state writes now clone runtime roots before mutation, live ship cosmetic presentation refreshes after apply, and owner/observer slim updates are sent. Added `shipCosmeticsApplyParity.test.js`.
+- Mutaplasmids: added `dynamicItemService`, advertised it through MachoNet service info, imported static dynamic item attribute data, persisted per-item dynamic attributes, applied rolled dogma overrides, consumed one mutaplasmid stack unit, and added dynamic item info retrieval. Added `dynamicItemServiceParity.test.js`.
+- Implants: shared active implant serialization across `GetImplants`, `GetCloneInfo`, and `GetCloneState`, with stable item/type/slot aliases for the character head and clone views. Extended `implantInjectionParity.test.js`.
+- `/capnpc 1 dreads` / `/npcw` visibility: guarded non-missile bootstrap-acquire ceiling so it cannot clear below the already-sent session lane, which prevents the fresh AddBalls packet from being dropped before the client sees the spawned NPC.
+
+Verification:
+
+- Passed: `node --test --test-concurrency=1 server/tests/dynamicItemServiceParity.test.js server/tests/shipCosmeticsApplyParity.test.js server/tests/implantInjectionParity.test.js server/tests/machoNetServerStatusParity.test.js server/tests/shipSlimFittingReplay.test.js server/tests/capitalNpcCommandFamily.test.js server/tests/chatCommandsNpcWarp.test.js server/tests/shipLogoGatewayParity.test.js server/tests/publicGatewayCompatibilityStubs.test.js`
+- Additional probe failed outside this issue batch: selected `spaceMissileParity.test.js` and `spaceMovementContracts.test.js` destiny timing patterns still fail on existing missile/movement lane assertions. The fix batch does not broaden into missile lifecycle timing; revisit separately before touching shared destiny policy.
 
 ## Issue Tracking
 

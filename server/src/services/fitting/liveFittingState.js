@@ -757,7 +757,32 @@ function buildEffectiveItemAttributeMap(itemOrTypeID, otherItem = null) {
       ? toInt(itemOrTypeID.typeID, 0)
       : toInt(itemOrTypeID, 0);
   const attributes = getTypeAttributeMap(typeID);
+  if (itemOrTypeID && typeof itemOrTypeID === "object") {
+    applyDynamicItemAttributesToMap(attributes, itemOrTypeID);
+  }
   applyOtherItemModifiersToAttributes(attributes, otherItem);
+  return attributes;
+}
+
+function applyDynamicItemAttributesToMap(attributes, item) {
+  if (!attributes || !item || typeof item !== "object") {
+    return attributes;
+  }
+  const dynamicAttributes =
+    item.dynamicAttributes && typeof item.dynamicAttributes === "object"
+      ? item.dynamicAttributes
+      : null;
+  if (!dynamicAttributes) {
+    return attributes;
+  }
+
+  for (const [rawAttributeID, rawValue] of Object.entries(dynamicAttributes)) {
+    const attributeID = toInt(rawAttributeID, 0);
+    const numericValue = Number(rawValue);
+    if (attributeID > 0 && Number.isFinite(numericValue)) {
+      attributes[attributeID] = numericValue;
+    }
+  }
   return attributes;
 }
 
